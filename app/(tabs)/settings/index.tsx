@@ -1391,7 +1391,7 @@ export default function SettingsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>P2P-Synchronisation</Text>
+              <Text style={styles.modalTitle}>Synchronisation</Text>
               <TouchableOpacity onPress={() => setShowP2PModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <X size={20} color={Colors.textSecondary} strokeWidth={1.7} />
               </TouchableOpacity>
@@ -1469,7 +1469,7 @@ export default function SettingsScreen() {
             <View style={styles.hostInstructions}>
               <Text style={styles.hostInstructionsTitle}>Anleitung für das andere Gerät:</Text>
               <Text style={styles.hostInstructionsText}>
-                1. Öffnen Sie Einstellungen → P2P-Synchronisation{"\n"}
+                1. Öffnen Sie Profil → Synchronisation{"\n"}
                 2. Tippen Sie auf &quot;Mit Gerät verbinden&quot;{"\n"}
                 3. Fügen Sie den kopierten Code ein{"\n"}
                 4. Tippen Sie auf &quot;Verbinden&quot;
@@ -1543,7 +1543,7 @@ export default function SettingsScreen() {
               <Text style={styles.clientInstructionsTitle}>So erhalten Sie den Code:</Text>
               <Text style={styles.clientInstructionsText}>
                 1. Öffnen Sie die App auf dem Host-Gerät{"\n"}
-                2. Gehen Sie zu Einstellungen → P2P-Synchronisation{"\n"}
+                2. Gehen Sie zu Profil → Synchronisation{"\n"}
                 3. Tippen Sie auf &quot;Neues Gerät koppeln&quot;{"\n"}
                 4. Kopieren Sie den angezeigten Code
               </Text>

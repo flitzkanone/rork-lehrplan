@@ -441,7 +441,7 @@ export default function OnboardingScreen() {
                       <Globe size={20} color={Colors.primary} strokeWidth={1.7} />
                     </View>
                     <View style={styles.privacyItemContent}>
-                      <Text style={styles.privacyItemTitle}>Keine externe Server</Text>
+                      <Text style={styles.privacyItemTitle}>Keine externen Server</Text>
                       <Text style={styles.privacyItemText}>
                         Diese App wurde von einer einzelnen Person entwickelt und kommuniziert mit keinen externen Servern. Ihre Daten verlassen niemals Ihr Gerät.
                       </Text>
@@ -951,8 +951,8 @@ export default function OnboardingScreen() {
               <View style={styles.textCodeInstructions}>
                 <Text style={styles.textCodeInstructionsText}>
                   1. Öffnen Sie die App auf dem anderen Gerät{"\n"}
-                  2. Gehen Sie zu Einstellungen → Gerätesynchronisation{"\n"}
-                  3. Tippen Sie auf &quot;Verbindung starten&quot;{"\n"}
+                  2. Gehen Sie zu Profil → Synchronisation{"\n"}
+                  3. Tippen Sie auf &quot;Neues Gerät koppeln&quot;{"\n"}
                   4. Kopieren Sie den angezeigten Code
                 </Text>
               </View>
