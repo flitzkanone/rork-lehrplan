@@ -1,4 +1,5 @@
 import CryptoJS from 'crypto-js';
+import * as ExpoCrypto from 'expo-crypto';
 
 const SALT = 'teacher_app_secure_salt_v1';
 const ITERATIONS = 10000;
@@ -13,7 +14,9 @@ export function deriveKey(pin: string): string {
 
 export function encrypt(data: string, pin: string): string {
   const key = deriveKey(pin);
-  const iv = CryptoJS.lib.WordArray.random(16);
+  const randomBytes = ExpoCrypto.getRandomBytes(16);
+  const hexString = Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  const iv = CryptoJS.enc.Hex.parse(hexString);
   const encrypted = CryptoJS.AES.encrypt(data, CryptoJS.enc.Hex.parse(key), {
     iv: iv,
     mode: CryptoJS.mode.CBC,
