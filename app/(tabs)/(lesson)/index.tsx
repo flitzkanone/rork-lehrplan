@@ -14,6 +14,7 @@ import { Play, ChevronRight, BookOpen, Users as UsersIcon } from 'lucide-react-n
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useApp } from '@/context/AppContext';
+import { LessonScreenSkeleton } from '@/components/SkeletonLoader';
 
 export default function LessonScreen() {
   const router = useRouter();
@@ -56,7 +57,7 @@ export default function LessonScreen() {
   }, [router]);
 
   if (isLoading || !data.onboardingComplete || !isAuthenticated) {
-    return <View style={styles.container} />;
+    return <LessonScreenSkeleton />;
   }
 
   if (data.classes.length === 0) {

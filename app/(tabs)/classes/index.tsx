@@ -16,12 +16,13 @@ import { Plus, Users, ChevronRight, Trash2, X } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useApp } from '@/context/AppContext';
+import { ClassesScreenSkeleton } from '@/components/SkeletonLoader';
 import type { SchoolClass } from '@/types';
 
 export default function ClassesScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { data, addClass, deleteClass } = useApp();
+  const { data, addClass, deleteClass, isLoading } = useApp();
   const [showModal, setShowModal] = useState<boolean>(false);
   const [newClassName, setNewClassName] = useState<string>('');
 
@@ -87,6 +88,10 @@ export default function ClassesScreen() {
     ),
     [router, handleDelete]
   );
+
+  if (isLoading) {
+    return <ClassesScreenSkeleton />;
+  }
 
   return (
     <View style={styles.container}>

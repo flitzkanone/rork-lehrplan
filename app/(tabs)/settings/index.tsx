@@ -18,6 +18,7 @@ import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import Colors from '@/constants/colors';
 import { DelayedInlineBanner, DelayedOverlay } from '@/components/DelayedLoader';
+import { SettingsScreenSkeleton } from '@/components/SkeletonLoader';
 import { ALL_SUBJECTS } from '@/constants/subjects';
 import { useApp } from '@/context/AppContext';
 import { useBackup } from '@/context/BackupContext';
@@ -633,6 +634,10 @@ export default function SettingsScreen() {
       )}
     </TouchableOpacity>
   );
+
+  if (data.profile.name === '' && !data.onboardingComplete) {
+    return <SettingsScreenSkeleton />;
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]} showsVerticalScrollIndicator={false}>

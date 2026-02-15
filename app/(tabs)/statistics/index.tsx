@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Search, Filter, TrendingUp, TrendingDown, Minus } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useApp } from '@/context/AppContext';
+import { StatisticsScreenSkeleton } from '@/components/SkeletonLoader';
 import type { Student } from '@/types';
 
 function MiniProgressBar({ positive, neutral, negative, total }: { positive: number; neutral: number; negative: number; total: number }) {
@@ -58,7 +59,7 @@ const barStyles = StyleSheet.create({
 });
 
 export default function StatisticsScreen() {
-  const { data } = useApp();
+  const { data, isLoading } = useApp();
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState<string>('');
   const [filterSubject, setFilterSubject] = useState<string | null>(null);
@@ -101,6 +102,10 @@ export default function StatisticsScreen() {
     },
     [data.participations, filterSubject]
   );
+
+  if (isLoading) {
+    return <StatisticsScreenSkeleton />;
+  }
 
   return (
     <View style={styles.container}>
