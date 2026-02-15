@@ -58,6 +58,11 @@ function RootLayoutNav() {
       <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
       <Stack.Screen name="lock" options={{ gestureEnabled: false }} />
       <Stack.Screen name="lesson-active" options={{ presentation: "modal", gestureEnabled: false }} />
+      <Stack.Screen name="random-wheel" options={{ presentation: "modal" }} />
+      <Stack.Screen name="homework-check" options={{ presentation: "modal" }} />
+      <Stack.Screen name="presentation-calc" options={{ presentation: "modal" }} />
+      <Stack.Screen name="resource-manager" options={{ presentation: "modal" }} />
+      <Stack.Screen name="parent-report" options={{ presentation: "modal" }} />
     </Stack>
   );
 }

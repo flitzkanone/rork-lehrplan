@@ -38,10 +38,90 @@ export interface TeacherProfile {
   subjects: string[];
 }
 
+export type HomeworkStatus = 'done' | 'forgotten' | 'late';
+
+export interface HomeworkEntry {
+  id: string;
+  studentId: string;
+  classId: string;
+  subject: string;
+  date: string;
+  status: HomeworkStatus;
+}
+
+export type BehaviorType = 'praise' | 'reprimand';
+
+export interface BehaviorEntry {
+  id: string;
+  studentId: string;
+  classId: string;
+  type: BehaviorType;
+  note: string;
+  date: string;
+}
+
+export interface PresentationCriteria {
+  content: number;
+  language: number;
+  media: number;
+  timing: number;
+  presence: number;
+}
+
+export interface PresentationWeights {
+  content: number;
+  language: number;
+  media: number;
+  timing: number;
+  presence: number;
+}
+
+export interface PresentationGrade {
+  id: string;
+  studentId: string;
+  classId: string;
+  subject: string;
+  criteria: PresentationCriteria;
+  weights: PresentationWeights;
+  calculatedGrade: number;
+  date: string;
+  topic: string;
+}
+
+export interface ResourceLink {
+  id: string;
+  classId: string;
+  subject: string;
+  url: string;
+  title: string;
+  createdAt: string;
+}
+
+export interface PhaseConfig {
+  name: string;
+  durationMinutes: number;
+}
+
+export interface LessonTimerConfig {
+  phases: PhaseConfig[];
+  enabled: boolean;
+}
+
+export interface StudentCallCount {
+  studentId: string;
+  classId: string;
+  count: number;
+}
+
 export interface AppData {
   profile: TeacherProfile;
   classes: SchoolClass[];
   participations: ParticipationEntry[];
+  homeworkEntries: HomeworkEntry[];
+  behaviorEntries: BehaviorEntry[];
+  presentationGrades: PresentationGrade[];
+  resources: ResourceLink[];
+  callCounts: StudentCallCount[];
   activeSession: LessonSession | null;
   onboardingComplete: boolean;
   pinHash: string;
