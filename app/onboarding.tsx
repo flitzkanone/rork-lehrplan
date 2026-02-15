@@ -379,7 +379,7 @@ export default function OnboardingScreen() {
       Alert.alert(
         'Erfolg',
         'Daten wurden wiederhergestellt. Sie können sich jetzt mit Ihrer PIN anmelden.',
-        [{ text: 'OK', onPress: () => router.replace('/lock' as any) }]
+        [{ text: 'OK', onPress: () => router.replace('/lock') }]
       );
     } else {
       Alert.alert('Fehler', 'Wiederherstellung fehlgeschlagen. Überprüfen Sie Ihre PIN.');

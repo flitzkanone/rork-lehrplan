@@ -11,15 +11,6 @@ import type {
   TeacherProfile,
   ParticipationRating,
   BackupMetadata,
-  HomeworkEntry,
-  HomeworkStatus,
-  BehaviorEntry,
-  BehaviorType,
-  PresentationGrade,
-  PresentationCriteria,
-  PresentationWeights,
-  ResourceLink,
-  StudentCallCount,
 } from '@/types';
 import { encrypt, decrypt, hashPin, verifyPin } from '@/utils/encryption';
 import { getLatestValidBackup, restoreBackup, logBackupAction } from '@/utils/backup';
@@ -39,11 +30,6 @@ const defaultData: AppData = {
   profile: { name: '', school: '', subjects: [] },
   classes: [],
   participations: [],
-  homeworkEntries: [],
-  behaviorEntries: [],
-  presentationGrades: [],
-  resources: [],
-  callCounts: [],
   activeSession: null,
   onboardingComplete: false,
   pinHash: '',
@@ -493,125 +479,6 @@ export const [AppProvider, useApp] = createContextHook(() => {
     return currentPinRef.current;
   }, []);
 
-  const addHomeworkEntries = useCallback(
-    (classId: string, subject: string, entries: { studentId: string; status: HomeworkStatus }[]) => {
-      const date = new Date().toISOString();
-      save((prev) => {
-        const newEntries: HomeworkEntry[] = entries.map((e) => ({
-          id: generateId(),
-          studentId: e.studentId,
-          classId,
-          subject,
-          date,
-          status: e.status,
-        }));
-        return { ...prev, homeworkEntries: [...prev.homeworkEntries, ...newEntries] };
-      });
-    },
-    [save]
-  );
-
-  const addBehaviorEntry = useCallback(
-    (studentId: string, classId: string, type: BehaviorType, note: string) => {
-      save((prev) => {
-        const entry: BehaviorEntry = {
-          id: generateId(),
-          studentId,
-          classId,
-          type,
-          note,
-          date: new Date().toISOString(),
-        };
-        return { ...prev, behaviorEntries: [...prev.behaviorEntries, entry] };
-      });
-    },
-    [save]
-  );
-
-  const addPresentationGrade = useCallback(
-    (studentId: string, classId: string, subject: string, topic: string, criteria: PresentationCriteria, weights: PresentationWeights) => {
-      const totalWeight = weights.content + weights.language + weights.media + weights.timing + weights.presence;
-      const calculatedGrade = totalWeight > 0
-        ? (criteria.content * weights.content + criteria.language * weights.language + criteria.media * weights.media + criteria.timing * weights.timing + criteria.presence * weights.presence) / totalWeight
-        : 0;
-      save((prev) => {
-        const grade: PresentationGrade = {
-          id: generateId(),
-          studentId,
-          classId,
-          subject,
-          criteria,
-          weights,
-          calculatedGrade: Math.round(calculatedGrade * 10) / 10,
-          date: new Date().toISOString(),
-          topic,
-        };
-        return { ...prev, presentationGrades: [...prev.presentationGrades, grade] };
-      });
-    },
-    [save]
-  );
-
-  const addResource = useCallback(
-    (classId: string, subject: string, url: string, title: string) => {
-      save((prev) => {
-        const resource: ResourceLink = {
-          id: generateId(),
-          classId,
-          subject,
-          url,
-          title,
-          createdAt: new Date().toISOString(),
-        };
-        return { ...prev, resources: [...prev.resources, resource] };
-      });
-    },
-    [save]
-  );
-
-  const deleteResource = useCallback(
-    (resourceId: string) => {
-      save((prev) => ({
-        ...prev,
-        resources: prev.resources.filter((r) => r.id !== resourceId),
-      }));
-    },
-    [save]
-  );
-
-  const incrementCallCount = useCallback(
-    (studentId: string, classId: string) => {
-      save((prev) => {
-        const existing = prev.callCounts.find((c) => c.studentId === studentId && c.classId === classId);
-        if (existing) {
-          return {
-            ...prev,
-            callCounts: prev.callCounts.map((c) =>
-              c.studentId === studentId && c.classId === classId
-                ? { ...c, count: c.count + 1 }
-                : c
-            ),
-          };
-        }
-        return {
-          ...prev,
-          callCounts: [...prev.callCounts, { studentId, classId, count: 1 }],
-        };
-      });
-    },
-    [save]
-  );
-
-  const resetCallCounts = useCallback(
-    (classId: string) => {
-      save((prev) => ({
-        ...prev,
-        callCounts: prev.callCounts.filter((c) => c.classId !== classId),
-      }));
-    },
-    [save]
-  );
-
   return {
     data,
     isLoading: dataQuery.isLoading || pinHashQuery.isLoading || privacyQuery.isLoading,
@@ -639,12 +506,5 @@ export const [AppProvider, useApp] = createContextHook(() => {
     dismissRecovery,
     acceptPrivacy,
     getCurrentPin,
-    addHomeworkEntries,
-    addBehaviorEntry,
-    addPresentationGrade,
-    addResource,
-    deleteResource,
-    incrementCallCount,
-    resetCallCounts,
   };
 });
