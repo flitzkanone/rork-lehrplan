@@ -37,10 +37,10 @@ function RootLayoutNav() {
         
         if (actionId === 'resume' || actionId === Notifications.DEFAULT_ACTION_IDENTIFIER) {
           console.log('[RootLayout] Navigating to lesson-active');
-          router.push('/lesson-active' as any);
+          router.push('/lesson-active');
         } else if (actionId === 'end') {
           console.log('[RootLayout] End lesson action - navigating to lesson to end');
-          router.push('/lesson-active' as any);
+          router.push('/lesson-active');
         }
       }
     });

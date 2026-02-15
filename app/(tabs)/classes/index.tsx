@@ -61,7 +61,7 @@ export default function ClassesScreen() {
     ({ item }: { item: SchoolClass }) => (
       <TouchableOpacity
         style={styles.classCard}
-        onPress={() => router.push(`/(tabs)/classes/${item.id}` as any)}
+        onPress={() => router.push(`/(tabs)/classes/${item.id}`)}
         activeOpacity={0.55}
       >
         <View style={styles.classLeft}>
