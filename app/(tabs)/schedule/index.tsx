@@ -21,7 +21,7 @@ import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useApp } from '@/context/AppContext';
 import { useTutorial } from '@/context/TutorialContext';
-import FeatureTour from '@/components/FeatureTour';
+
 import {
   DAYS,
   SCHEDULE_COLORS,
@@ -1625,7 +1625,7 @@ export default function ScheduleScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-      <FeatureTour />
+
     </View>
   );
 }
