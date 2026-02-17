@@ -271,3 +271,22 @@ export interface ExternalBackupFile {
   isValid: boolean;
   size: number;
 }
+
+export interface ScheduleTimeSettings {
+  lessonStartTime: string;
+  lessonDuration: number;
+  breakAfterPeriods: number[];
+  breakDurations: Record<number, number>;
+  maxPeriods: number;
+}
+
+export interface ScheduleEntry {
+  id: string;
+  dayIndex: number;
+  periodStart: number;
+  periodEnd: number;
+  className: string;
+  subject: string;
+  room: string;
+  color: string;
+}

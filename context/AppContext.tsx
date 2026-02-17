@@ -11,7 +11,10 @@ import type {
   TeacherProfile,
   ParticipationRating,
   BackupMetadata,
+  ScheduleTimeSettings,
+  ScheduleEntry,
 } from '@/types';
+import { DEFAULT_TIME_SETTINGS, PLACEHOLDER_ENTRIES } from '@/mocks/schedule';
 import { encrypt, decrypt, hashPin, verifyPin } from '@/utils/encryption';
 import { getLatestValidBackup, restoreBackup, logBackupAction } from '@/utils/backup';
 import {
@@ -25,6 +28,8 @@ const STORAGE_KEY = 'teacher_app_data_encrypted';
 const PIN_HASH_KEY = 'teacher_app_pin_hash';
 const RECOVERY_ATTEMPTED_KEY = 'teacher_app_recovery_attempted';
 const PRIVACY_ACCEPTED_KEY = 'teacher_app_privacy_accepted';
+const SCHEDULE_ENTRIES_KEY = 'teacher_app_schedule_entries';
+const SCHEDULE_SETTINGS_KEY = 'teacher_app_schedule_settings';
 
 const defaultData: AppData = {
   profile: { name: '', school: '', subjects: [] },
@@ -479,6 +484,85 @@ export const [AppProvider, useApp] = createContextHook(() => {
     return currentPinRef.current;
   }, []);
 
+  const [scheduleEntries, setScheduleEntries] = useState<ScheduleEntry[]>(PLACEHOLDER_ENTRIES);
+  const [scheduleTimeSettings, setScheduleTimeSettings] = useState<ScheduleTimeSettings>(DEFAULT_TIME_SETTINGS);
+
+  const scheduleQuery = useQuery({
+    queryKey: ['scheduleData'],
+    queryFn: async () => {
+      const [entriesRaw, settingsRaw] = await Promise.all([
+        AsyncStorage.getItem(SCHEDULE_ENTRIES_KEY),
+        AsyncStorage.getItem(SCHEDULE_SETTINGS_KEY),
+      ]);
+      return {
+        entries: entriesRaw ? (JSON.parse(entriesRaw) as ScheduleEntry[]) : PLACEHOLDER_ENTRIES,
+        settings: settingsRaw ? (JSON.parse(settingsRaw) as ScheduleTimeSettings) : DEFAULT_TIME_SETTINGS,
+      };
+    },
+  });
+
+  useEffect(() => {
+    if (scheduleQuery.data) {
+      setScheduleEntries(scheduleQuery.data.entries);
+      setScheduleTimeSettings(scheduleQuery.data.settings);
+    }
+  }, [scheduleQuery.data]);
+
+  const saveScheduleEntries = useCallback(
+    async (entries: ScheduleEntry[]) => {
+      setScheduleEntries(entries);
+      await AsyncStorage.setItem(SCHEDULE_ENTRIES_KEY, JSON.stringify(entries));
+      queryClient.setQueryData(['scheduleData'], (old: { entries: ScheduleEntry[]; settings: ScheduleTimeSettings } | undefined) => ({
+        entries,
+        settings: old?.settings ?? DEFAULT_TIME_SETTINGS,
+      }));
+    },
+    [queryClient]
+  );
+
+  const saveScheduleTimeSettings = useCallback(
+    async (settings: ScheduleTimeSettings) => {
+      setScheduleTimeSettings(settings);
+      await AsyncStorage.setItem(SCHEDULE_SETTINGS_KEY, JSON.stringify(settings));
+      queryClient.setQueryData(['scheduleData'], (old: { entries: ScheduleEntry[]; settings: ScheduleTimeSettings } | undefined) => ({
+        entries: old?.entries ?? PLACEHOLDER_ENTRIES,
+        settings,
+      }));
+    },
+    [queryClient]
+  );
+
+  const addScheduleEntry = useCallback(
+    (entry: Omit<ScheduleEntry, 'id'>) => {
+      const newEntry: ScheduleEntry = {
+        ...entry,
+        id: generateId(),
+      };
+      const updated = [...scheduleEntries, newEntry];
+      saveScheduleEntries(updated);
+      return newEntry;
+    },
+    [scheduleEntries, saveScheduleEntries]
+  );
+
+  const deleteScheduleEntry = useCallback(
+    (entryId: string) => {
+      const updated = scheduleEntries.filter((e) => e.id !== entryId);
+      saveScheduleEntries(updated);
+    },
+    [scheduleEntries, saveScheduleEntries]
+  );
+
+  const updateScheduleEntry = useCallback(
+    (entryId: string, updates: Partial<ScheduleEntry>) => {
+      const updated = scheduleEntries.map((e) =>
+        e.id === entryId ? { ...e, ...updates } : e
+      );
+      saveScheduleEntries(updated);
+    },
+    [scheduleEntries, saveScheduleEntries]
+  );
+
   return {
     data,
     isLoading: dataQuery.isLoading || pinHashQuery.isLoading || privacyQuery.isLoading,
@@ -506,5 +590,11 @@ export const [AppProvider, useApp] = createContextHook(() => {
     dismissRecovery,
     acceptPrivacy,
     getCurrentPin,
+    scheduleEntries,
+    scheduleTimeSettings,
+    addScheduleEntry,
+    deleteScheduleEntry,
+    updateScheduleEntry,
+    saveScheduleTimeSettings,
   };
 });
