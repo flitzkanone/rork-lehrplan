@@ -10,6 +10,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import { AppProvider } from "@/context/AppContext";
 import { BackupProvider } from "@/context/BackupContext";
 import { P2PProvider } from "@/context/P2PContext";
+import { TutorialProvider } from "@/context/TutorialContext";
 import {
   addNotificationResponseListener,
   setupNotificationCategories,
@@ -74,8 +75,10 @@ export default function RootLayout() {
           <AppProvider>
             <BackupProvider>
               <P2PProvider>
-                <StatusBar style="dark" />
-                <RootLayoutNav />
+                <TutorialProvider>
+                  <StatusBar style="dark" />
+                  <RootLayoutNav />
+                </TutorialProvider>
               </P2PProvider>
             </BackupProvider>
           </AppProvider>

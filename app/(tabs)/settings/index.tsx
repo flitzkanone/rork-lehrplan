@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { User, School, BookOpen, Lock, ChevronRight, ChevronDown, X, LogOut, Trash2, Save, RotateCcw, Clock, HardDrive, Download, Upload, FileSpreadsheet, FileText, File, Check, Calendar, Eye, Shield, Wifi, Smartphone, Link, Unlink, RefreshCw, Radio, Copy, AlertCircle, Database, ArrowRight, ArrowLeft, Info, FileUp } from 'lucide-react-native';
+import { User, School, BookOpen, Lock, ChevronRight, ChevronDown, X, LogOut, Trash2, Save, RotateCcw, Clock, HardDrive, Download, Upload, FileSpreadsheet, FileText, File, Check, Calendar, Eye, Shield, Wifi, Smartphone, Link, Unlink, RefreshCw, Radio, Copy, AlertCircle, Database, ArrowRight, ArrowLeft, Info, FileUp, HelpCircle } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
@@ -23,6 +23,7 @@ import { ALL_SUBJECTS } from '@/constants/subjects';
 import { useApp } from '@/context/AppContext';
 import { useBackup } from '@/context/BackupContext';
 import { useP2P } from '@/context/P2PContext';
+import { useTutorial } from '@/context/TutorialContext';
 import { formatBackupDate, formatBackupSize } from '@/utils/backup';
 import type { BackupFrequency, BackupMetadata, ExportFormat, ExportField, ExportOptions, ExportableStudentStats, P2PPairedDevice } from '@/types';
 import { getDefaultExportFields, generateStatisticsData, exportToFile } from '@/utils/export';
@@ -31,6 +32,7 @@ import { getDefaultExportFields, generateStatisticsData, exportToFile } from '@/
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { data, updateProfile, updatePin, lock, resetApp, getCurrentPin } = useApp();
+  const { replayTutorial } = useTutorial();
   const {
     settings: p2pSettings,
     syncState,
@@ -867,6 +869,11 @@ export default function SettingsScreen() {
 
       <DelayedOverlay visible={isExporting} message="Export wird erstellt..." />
       <DelayedOverlay visible={syncState.status === 'syncing'} message="Synchronisiere..." />
+
+      <TouchableOpacity style={styles.tutorialBtn} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); replayTutorial(); }} activeOpacity={0.55}>
+        <HelpCircle size={15} color={Colors.primary} strokeWidth={1.7} />
+        <Text style={styles.tutorialBtnText}>Tutorial erneut abspielen</Text>
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.lockBtn} onPress={handleLock} activeOpacity={0.55}>
         <LogOut size={15} color={Colors.textSecondary} strokeWidth={1.7} />
@@ -2815,6 +2822,22 @@ const styles = StyleSheet.create({
     color: Colors.text,
     letterSpacing: 4,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  tutorialBtn: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 8,
+    paddingVertical: 14,
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 12,
+    backgroundColor: Colors.primaryLight,
+  },
+  tutorialBtnText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: Colors.primary,
   },
   versionText: {
     fontSize: 12,

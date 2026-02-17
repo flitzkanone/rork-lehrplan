@@ -20,6 +20,8 @@ import { ChevronLeft, ChevronRight, Plus, Settings2, X, Trash2, Check, Clock, Ca
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useApp } from '@/context/AppContext';
+import { useTutorial } from '@/context/TutorialContext';
+import FeatureTour from '@/components/FeatureTour';
 import {
   DAYS,
   SCHEDULE_COLORS,
@@ -231,6 +233,9 @@ export default function ScheduleScreen() {
     data,
   } = useApp();
 
+  const { triggerFirstTimeTutorial } = useTutorial();
+  const tutorialTriggered = React.useRef(false);
+
   const [weekOffset, setWeekOffset] = useState<number>(0);
   const [gridAreaHeight, setGridAreaHeight] = useState<number>(0);
   const panX = useRef(new Animated.Value(0)).current;
@@ -273,6 +278,16 @@ export default function ScheduleScreen() {
   const [tempMaxPeriods, setTempMaxPeriods] = useState<string>(String(scheduleTimeSettings.maxPeriods));
   const [tempBreakAfter, setTempBreakAfter] = useState<number[]>(scheduleTimeSettings.breakAfterPeriods);
   const [tempBreakDurations, setTempBreakDurations] = useState<Record<number, number>>(scheduleTimeSettings.breakDurations);
+
+  React.useEffect(() => {
+    if (!tutorialTriggered.current) {
+      tutorialTriggered.current = true;
+      const timer = setTimeout(() => {
+        triggerFirstTimeTutorial();
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [triggerFirstTimeTutorial]);
 
   const today = useMemo(() => new Date(), []);
 
@@ -1610,6 +1625,7 @@ export default function ScheduleScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      <FeatureTour />
     </View>
   );
 }
