@@ -56,6 +56,9 @@ export default function OnboardingScreen() {
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [isImportingFile, setIsImportingFile] = useState<boolean>(false);
   const [isCompleting, setIsCompleting] = useState<boolean>(false);
+  const [showLoadingScreen, setShowLoadingScreen] = useState<boolean>(false);
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const loadingFadeAnim = useRef(new Animated.Value(1)).current;
   
   const [hasScannedOnce, setHasScannedOnce] = useState<boolean>(false);
   const [showBackupDiscoveryModal, setShowBackupDiscoveryModal] = useState<boolean>(false);
@@ -111,10 +114,26 @@ export default function OnboardingScreen() {
       setIsCompleting(true);
       try {
         await completeOnboarding({ name: name.trim(), school: school.trim(), subjects: selectedSubjects }, pin);
-        setTimeout(() => {
-          router.replace('/');
-        }, 100);
-      } finally {
+        setIsCompleting(false);
+        setShowLoadingScreen(true);
+        progressAnim.setValue(0);
+        loadingFadeAnim.setValue(1);
+        Animated.timing(progressAnim, {
+          toValue: 1,
+          duration: 1800,
+          useNativeDriver: false,
+        }).start(() => {
+          setTimeout(() => {
+            Animated.timing(loadingFadeAnim, {
+              toValue: 0,
+              duration: 300,
+              useNativeDriver: true,
+            }).start(() => {
+              router.replace('/');
+            });
+          }, 200);
+        });
+      } catch {
         setIsCompleting(false);
       }
     }
@@ -388,6 +407,46 @@ export default function OnboardingScreen() {
 
   const stepIndex = step === 'privacy' ? 0 : step === 'profile' ? 1 : step === 'pin' ? 2 : 3;
   const totalSteps = 4;
+
+  const loadingMessages = [
+    'Stundenplan wird erstellt...',
+    'Zeitplan wird kalibriert...',
+    'Fächer werden zugeordnet...',
+  ];
+  const [loadingMsg] = useState(() => loadingMessages[Math.floor(Math.random() * loadingMessages.length)]);
+
+  if (showLoadingScreen) {
+    const progressWidth = progressAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0%', '100%'],
+    });
+
+    const percentText = progressAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0', '100'],
+    });
+
+    return (
+      <Animated.View style={[styles.loadingRoot, { opacity: loadingFadeAnim }]}>
+        <View style={styles.loadingContent}>
+          <View style={styles.loadingIconWrap}>
+            <Clock size={32} color={Colors.primary} strokeWidth={1.5} />
+          </View>
+          <Text style={styles.loadingTitle}>Fast geschafft!</Text>
+          <Text style={styles.loadingSubtitle}>{loadingMsg}</Text>
+          <View style={styles.progressTrack}>
+            <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
+          </View>
+          <Animated.Text style={styles.loadingPercent}>
+            {percentText.interpolate({
+              inputRange: [0, 100],
+              outputRange: ['0%', '100%'],
+            })}
+          </Animated.Text>
+        </View>
+      </Animated.View>
+    );
+  }
 
   return (
     <View style={styles.root}>
@@ -1607,5 +1666,54 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500' as const,
     color: Colors.textSecondary,
+  },
+  loadingRoot: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
+  loadingContent: {
+    alignItems: 'center' as const,
+    paddingHorizontal: 48,
+    width: '100%' as const,
+  },
+  loadingIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    backgroundColor: Colors.inputBg,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    marginBottom: 24,
+  },
+  loadingTitle: {
+    fontSize: 22,
+    fontWeight: '700' as const,
+    color: Colors.text,
+    marginBottom: 8,
+  },
+  loadingSubtitle: {
+    fontSize: 15,
+    color: Colors.textSecondary,
+    marginBottom: 32,
+  },
+  progressTrack: {
+    width: '100%' as const,
+    height: 6,
+    backgroundColor: Colors.inputBg,
+    borderRadius: 3,
+    overflow: 'hidden' as const,
+  },
+  progressFill: {
+    height: '100%' as const,
+    backgroundColor: Colors.primary,
+    borderRadius: 3,
+  },
+  loadingPercent: {
+    fontSize: 13,
+    color: Colors.textLight,
+    marginTop: 12,
+    fontVariant: ['tabular-nums'] as any,
   },
 });
