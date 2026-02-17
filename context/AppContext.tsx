@@ -10,6 +10,7 @@ import type {
   LessonSession,
   TeacherProfile,
   ParticipationRating,
+  ParticipationReason,
   BackupMetadata,
   ScheduleTimeSettings,
   ScheduleEntry,
@@ -302,6 +303,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
         subject,
         startedAt: new Date().toISOString(),
         ratings: {},
+        reasons: {},
       };
       save((prev) => {
         const schoolClass = prev.classes.find((c) => c.id === classId);
@@ -315,10 +317,11 @@ export const [AppProvider, useApp] = createContextHook(() => {
   );
 
   const rateStudent = useCallback(
-    (studentId: string, rating: ParticipationRating) => {
+    (studentId: string, rating: ParticipationRating, reason: ParticipationReason = null) => {
       save((prev) => {
         if (!prev.activeSession) return prev;
         const newRatings = { ...prev.activeSession.ratings, [studentId]: rating };
+        const newReasons = { ...(prev.activeSession.reasons || {}), [studentId]: reason };
         const schoolClass = prev.classes.find((c) => c.id === prev.activeSession!.classId);
         const totalStudents = schoolClass?.students.length || 0;
         const ratedCount = Object.keys(newRatings).length;
@@ -335,6 +338,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
           activeSession: {
             ...prev.activeSession,
             ratings: newRatings,
+            reasons: newReasons,
           },
         };
       });
@@ -356,6 +360,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
         classId: session.classId,
         subject: session.subject,
         rating: session.ratings[s.id] || 'o',
+        reason: session.reasons?.[s.id] || null,
         date: session.startedAt,
         sessionId: session.id,
       }));

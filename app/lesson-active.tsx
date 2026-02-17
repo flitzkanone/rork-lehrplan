@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,34 @@ import {
   Alert,
   Animated,
   Platform,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Plus, Minus, Circle, CheckCircle } from 'lucide-react-native';
+import { Plus, Minus, Circle, CheckCircle, Users, ThumbsUp, HandHelping, EyeOff, Volume2, FileX } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useApp } from '@/context/AppContext';
-import type { ParticipationRating } from '@/types';
+import type { ParticipationRating, ParticipationReason, PositiveReason, NegativeReason } from '@/types';
+
+interface ReasonOption {
+  reason: ParticipationReason;
+  label: string;
+  icon: React.ReactNode;
+}
+
+const POSITIVE_REASONS: ReasonOption[] = [
+  { reason: 'good_participation', label: 'Gute Mitarbeit', icon: <ThumbsUp size={18} color={Colors.text} strokeWidth={1.8} /> },
+  { reason: 'group_work', label: 'Gruppenarbeit', icon: <Users size={18} color={Colors.text} strokeWidth={1.8} /> },
+  { reason: 'helpful', label: 'Hilfsbereit', icon: <HandHelping size={18} color={Colors.text} strokeWidth={1.8} /> },
+];
+
+const NEGATIVE_REASONS: ReasonOption[] = [
+  { reason: 'unfocused', label: 'Unkonzentriert', icon: <EyeOff size={18} color={Colors.negative} strokeWidth={1.8} /> },
+  { reason: 'disruptive', label: 'Ablenkend', icon: <Volume2 size={18} color={Colors.negative} strokeWidth={1.8} /> },
+  { reason: 'unprepared', label: 'Unvorbereitet', icon: <FileX size={18} color={Colors.negative} strokeWidth={1.8} /> },
+];
 
 function RatingButton({
   type,
@@ -57,10 +77,79 @@ function RatingButton({
   );
 }
 
+function ReasonMenu({
+  visible,
+  reasons,
+  isNegative,
+  onSelect,
+  onClose,
+}: {
+  visible: boolean;
+  reasons: ReasonOption[];
+  isNegative: boolean;
+  onSelect: (reason: ParticipationReason) => void;
+  onClose: () => void;
+}) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.9)).current;
+
+  React.useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, { toValue: 1, duration: 150, useNativeDriver: true }),
+        Animated.spring(scaleAnim, { toValue: 1, friction: 8, tension: 100, useNativeDriver: true }),
+      ]).start();
+    } else {
+      fadeAnim.setValue(0);
+      scaleAnim.setValue(0.9);
+    }
+  }, [visible, fadeAnim, scaleAnim]);
+
+  if (!visible) return null;
+
+  return (
+    <Animated.View
+      style={[
+        styles.reasonMenu,
+        isNegative ? styles.reasonMenuNegative : styles.reasonMenuPositive,
+        {
+          opacity: fadeAnim,
+          transform: [{ scale: scaleAnim }],
+        },
+      ]}
+    >
+      {reasons.map((item, index) => (
+        <TouchableOpacity
+          key={item.reason}
+          style={[
+            styles.reasonOption,
+            index < reasons.length - 1 && styles.reasonOptionBorder,
+          ]}
+          onPress={() => onSelect(item.reason)}
+          activeOpacity={0.6}
+        >
+          {item.icon}
+          <Text style={[styles.reasonLabel, isNegative && styles.reasonLabelNegative]}>
+            {item.label}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </Animated.View>
+  );
+}
+
+function getReasonLabel(reason: ParticipationReason): string | null {
+  if (!reason) return null;
+  const all = [...POSITIVE_REASONS, ...NEGATIVE_REASONS];
+  return all.find((r) => r.reason === reason)?.label ?? null;
+}
+
 export default function LessonActiveScreen() {
   const router = useRouter();
   const { data, rateStudent, endSession } = useApp();
   const session = data.activeSession;
+  const [openMenuStudentId, setOpenMenuStudentId] = useState<string | null>(null);
+  const [openMenuType, setOpenMenuType] = useState<'+' | '-' | null>(null);
 
   const currentClass = data.classes.find((c) => c.id === session?.classId);
 
@@ -83,13 +172,43 @@ export default function LessonActiveScreen() {
     );
   }, [endSession, router]);
 
-  const handleRate = useCallback(
-    (studentId: string, rating: ParticipationRating) => {
+  const handleRatingPress = useCallback(
+    (studentId: string, type: ParticipationRating) => {
+      if (type === 'o') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        rateStudent(studentId, 'o', null);
+        setOpenMenuStudentId(null);
+        setOpenMenuType(null);
+        return;
+      }
+
+      if (openMenuStudentId === studentId && openMenuType === type) {
+        setOpenMenuStudentId(null);
+        setOpenMenuType(null);
+        return;
+      }
+
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      rateStudent(studentId, rating);
+      setOpenMenuStudentId(studentId);
+      setOpenMenuType(type);
+    },
+    [openMenuStudentId, openMenuType, rateStudent]
+  );
+
+  const handleReasonSelect = useCallback(
+    (studentId: string, rating: ParticipationRating, reason: ParticipationReason) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      rateStudent(studentId, rating, reason);
+      setOpenMenuStudentId(null);
+      setOpenMenuType(null);
     },
     [rateStudent]
   );
+
+  const handleCloseMenu = useCallback(() => {
+    setOpenMenuStudentId(null);
+    setOpenMenuType(null);
+  }, []);
 
   if (!session || !currentClass) {
     return (
@@ -108,6 +227,9 @@ export default function LessonActiveScreen() {
 
   return (
     <View style={styles.root}>
+      {openMenuStudentId && (
+        <Pressable style={styles.backdropOverlay} onPress={handleCloseMenu} />
+      )}
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
           <View style={styles.headerTop}>
@@ -134,42 +256,87 @@ export default function LessonActiveScreen() {
             .sort((a, b) => a.lastName.localeCompare(b.lastName))
             .map((student) => {
               const currentRating = session.ratings[student.id] as ParticipationRating | undefined;
+              const currentReason = session.reasons?.[student.id] ?? null;
+              const reasonLabel = getReasonLabel(currentReason);
+              const isMenuOpen = openMenuStudentId === student.id;
+              const menuIsPositive = isMenuOpen && openMenuType === '+';
+              const menuIsNegative = isMenuOpen && openMenuType === '-';
+
               return (
-                <View key={student.id} style={styles.studentRow}>
-                  <View style={styles.studentInfo}>
-                    <View style={styles.studentAvatar}>
-                      <Text style={styles.avatarText}>
-                        {(student.firstName || '?')[0]}{(student.lastName || '?')[0]}
-                      </Text>
-                    </View>
-                    <View style={styles.studentTextWrap}>
-                      <Text style={styles.studentName}>
-                        {student.lastName}, {student.firstName}
-                      </Text>
-                      {student.note ? (
-                        <Text style={styles.studentNote} numberOfLines={1}>
-                          {student.note}
+                <View key={student.id} style={styles.studentCard}>
+                  <View style={styles.studentRow}>
+                    <View style={styles.studentInfo}>
+                      <View style={[
+                        styles.studentAvatar,
+                        currentRating === '+' && styles.avatarPositive,
+                        currentRating === '-' && styles.avatarNegative,
+                      ]}>
+                        <Text style={[
+                          styles.avatarText,
+                          currentRating === '+' && styles.avatarTextPositive,
+                          currentRating === '-' && styles.avatarTextNegative,
+                        ]}>
+                          {(student.firstName || '?')[0]}{(student.lastName || '?')[0]}
                         </Text>
-                      ) : null}
+                      </View>
+                      <View style={styles.studentTextWrap}>
+                        <Text style={styles.studentName}>
+                          {student.lastName}{student.lastName ? ', ' : ''}{student.firstName}
+                        </Text>
+                        {reasonLabel ? (
+                          <View style={styles.reasonBadgeRow}>
+                            <View style={[
+                              styles.reasonBadge,
+                              currentRating === '-' ? styles.reasonBadgeNeg : styles.reasonBadgePos,
+                            ]}>
+                              <Text style={[
+                                styles.reasonBadgeText,
+                                currentRating === '-' ? styles.reasonBadgeTextNeg : styles.reasonBadgeTextPos,
+                              ]}>
+                                {reasonLabel}
+                              </Text>
+                            </View>
+                          </View>
+                        ) : student.note ? (
+                          <Text style={styles.studentNote} numberOfLines={1}>
+                            {student.note}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </View>
+                    <View style={styles.ratingRow}>
+                      <RatingButton
+                        type="+"
+                        active={currentRating === '+'}
+                        onPress={() => handleRatingPress(student.id, '+')}
+                      />
+                      <RatingButton
+                        type="o"
+                        active={currentRating === 'o'}
+                        onPress={() => handleRatingPress(student.id, 'o')}
+                      />
+                      <RatingButton
+                        type="-"
+                        active={currentRating === '-'}
+                        onPress={() => handleRatingPress(student.id, '-')}
+                      />
                     </View>
                   </View>
-                  <View style={styles.ratingRow}>
-                    <RatingButton
-                      type="+"
-                      active={currentRating === '+'}
-                      onPress={() => handleRate(student.id, '+')}
-                    />
-                    <RatingButton
-                      type="o"
-                      active={currentRating === 'o'}
-                      onPress={() => handleRate(student.id, 'o')}
-                    />
-                    <RatingButton
-                      type="-"
-                      active={currentRating === '-'}
-                      onPress={() => handleRate(student.id, '-')}
-                    />
-                  </View>
+
+                  <ReasonMenu
+                    visible={menuIsPositive}
+                    reasons={POSITIVE_REASONS}
+                    isNegative={false}
+                    onSelect={(reason) => handleReasonSelect(student.id, '+', reason)}
+                    onClose={handleCloseMenu}
+                  />
+                  <ReasonMenu
+                    visible={menuIsNegative}
+                    reasons={NEGATIVE_REASONS}
+                    isNegative={true}
+                    onSelect={(reason) => handleReasonSelect(student.id, '-', reason)}
+                    onClose={handleCloseMenu}
+                  />
                 </View>
               );
             })}
@@ -186,6 +353,10 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+  },
+  backdropOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 5,
   },
   emptyContainer: {
     flex: 1,
@@ -215,6 +386,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderBottomWidth: 0.5,
     borderBottomColor: Colors.divider,
+    zIndex: 10,
   },
   headerTop: {
     flexDirection: 'row',
@@ -279,6 +451,10 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 8,
   },
+  studentCard: {
+    position: 'relative' as const,
+    zIndex: 1,
+  },
   studentRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -306,10 +482,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  avatarPositive: {
+    backgroundColor: Colors.positiveLight,
+    borderWidth: 1.5,
+    borderColor: Colors.positive,
+  },
+  avatarNegative: {
+    backgroundColor: Colors.negativeLight,
+    borderWidth: 1.5,
+    borderColor: Colors.negative,
+  },
   avatarText: {
     fontSize: 12,
     fontWeight: '600' as const,
     color: Colors.primary,
+  },
+  avatarTextPositive: {
+    color: Colors.positive,
+  },
+  avatarTextNegative: {
+    color: Colors.negative,
   },
   studentTextWrap: {
     flex: 1,
@@ -325,6 +517,31 @@ const styles = StyleSheet.create({
     maxWidth: 120,
     marginTop: 1,
   },
+  reasonBadgeRow: {
+    flexDirection: 'row',
+    marginTop: 3,
+  },
+  reasonBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  reasonBadgePos: {
+    backgroundColor: Colors.positiveLight,
+  },
+  reasonBadgeNeg: {
+    backgroundColor: Colors.negativeLight,
+  },
+  reasonBadgeText: {
+    fontSize: 11,
+    fontWeight: '500' as const,
+  },
+  reasonBadgeTextPos: {
+    color: Colors.positive,
+  },
+  reasonBadgeTextNeg: {
+    color: Colors.negative,
+  },
   ratingRow: {
     flexDirection: 'row',
     gap: 6,
@@ -336,5 +553,45 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  reasonMenu: {
+    marginTop: 6,
+    borderRadius: 14,
+    overflow: 'hidden',
+    zIndex: 20,
+    ...Platform.select({
+      ios: { shadowColor: 'rgba(0,0,0,0.12)', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 12 },
+      android: { elevation: 4 },
+      default: {},
+    }),
+  },
+  reasonMenuPositive: {
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+  },
+  reasonMenuNegative: {
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: '#F0D4D0',
+  },
+  reasonOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  reasonOptionBorder: {
+    borderBottomWidth: 0.5,
+    borderBottomColor: Colors.divider,
+  },
+  reasonLabel: {
+    fontSize: 15,
+    fontWeight: '500' as const,
+    color: Colors.text,
+  },
+  reasonLabelNegative: {
+    color: Colors.negative,
   },
 });

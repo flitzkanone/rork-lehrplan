@@ -14,12 +14,17 @@ export interface SchoolClass {
 
 export type ParticipationRating = '+' | 'o' | '-';
 
+export type PositiveReason = 'good_participation' | 'group_work' | 'helpful';
+export type NegativeReason = 'unfocused' | 'disruptive' | 'unprepared';
+export type ParticipationReason = PositiveReason | NegativeReason | null;
+
 export interface ParticipationEntry {
   id: string;
   studentId: string;
   classId: string;
   subject: string;
   rating: ParticipationRating;
+  reason: ParticipationReason;
   date: string;
   sessionId: string;
 }
@@ -30,6 +35,7 @@ export interface LessonSession {
   subject: string;
   startedAt: string;
   ratings: Record<string, ParticipationRating>;
+  reasons: Record<string, ParticipationReason>;
 }
 
 export interface TeacherProfile {
