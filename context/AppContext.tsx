@@ -13,6 +13,7 @@ import type {
   BackupMetadata,
   ScheduleTimeSettings,
   ScheduleEntry,
+  OneTimeEvent,
 } from '@/types';
 import { DEFAULT_TIME_SETTINGS, PLACEHOLDER_ENTRIES } from '@/mocks/schedule';
 import { encrypt, decrypt, hashPin, verifyPin } from '@/utils/encryption';
@@ -30,6 +31,7 @@ const RECOVERY_ATTEMPTED_KEY = 'teacher_app_recovery_attempted';
 const PRIVACY_ACCEPTED_KEY = 'teacher_app_privacy_accepted';
 const SCHEDULE_ENTRIES_KEY = 'teacher_app_schedule_entries';
 const SCHEDULE_SETTINGS_KEY = 'teacher_app_schedule_settings';
+const ONE_TIME_EVENTS_KEY = 'teacher_app_one_time_events';
 
 const defaultData: AppData = {
   profile: { name: '', school: '', subjects: [] },
@@ -486,17 +488,20 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
   const [scheduleEntries, setScheduleEntries] = useState<ScheduleEntry[]>(PLACEHOLDER_ENTRIES);
   const [scheduleTimeSettings, setScheduleTimeSettings] = useState<ScheduleTimeSettings>(DEFAULT_TIME_SETTINGS);
+  const [oneTimeEvents, setOneTimeEvents] = useState<OneTimeEvent[]>([]);
 
   const scheduleQuery = useQuery({
     queryKey: ['scheduleData'],
     queryFn: async () => {
-      const [entriesRaw, settingsRaw] = await Promise.all([
+      const [entriesRaw, settingsRaw, eventsRaw] = await Promise.all([
         AsyncStorage.getItem(SCHEDULE_ENTRIES_KEY),
         AsyncStorage.getItem(SCHEDULE_SETTINGS_KEY),
+        AsyncStorage.getItem(ONE_TIME_EVENTS_KEY),
       ]);
       return {
         entries: entriesRaw ? (JSON.parse(entriesRaw) as ScheduleEntry[]) : PLACEHOLDER_ENTRIES,
         settings: settingsRaw ? (JSON.parse(settingsRaw) as ScheduleTimeSettings) : DEFAULT_TIME_SETTINGS,
+        events: eventsRaw ? (JSON.parse(eventsRaw) as OneTimeEvent[]) : [],
       };
     },
   });
@@ -505,6 +510,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     if (scheduleQuery.data) {
       setScheduleEntries(scheduleQuery.data.entries);
       setScheduleTimeSettings(scheduleQuery.data.settings);
+      setOneTimeEvents(scheduleQuery.data.events);
     }
   }, [scheduleQuery.data]);
 
@@ -512,9 +518,10 @@ export const [AppProvider, useApp] = createContextHook(() => {
     async (entries: ScheduleEntry[]) => {
       setScheduleEntries(entries);
       await AsyncStorage.setItem(SCHEDULE_ENTRIES_KEY, JSON.stringify(entries));
-      queryClient.setQueryData(['scheduleData'], (old: { entries: ScheduleEntry[]; settings: ScheduleTimeSettings } | undefined) => ({
+      queryClient.setQueryData(['scheduleData'], (old: { entries: ScheduleEntry[]; settings: ScheduleTimeSettings; events: OneTimeEvent[] } | undefined) => ({
         entries,
         settings: old?.settings ?? DEFAULT_TIME_SETTINGS,
+        events: old?.events ?? [],
       }));
     },
     [queryClient]
@@ -524,12 +531,44 @@ export const [AppProvider, useApp] = createContextHook(() => {
     async (settings: ScheduleTimeSettings) => {
       setScheduleTimeSettings(settings);
       await AsyncStorage.setItem(SCHEDULE_SETTINGS_KEY, JSON.stringify(settings));
-      queryClient.setQueryData(['scheduleData'], (old: { entries: ScheduleEntry[]; settings: ScheduleTimeSettings } | undefined) => ({
+      queryClient.setQueryData(['scheduleData'], (old: { entries: ScheduleEntry[]; settings: ScheduleTimeSettings; events: OneTimeEvent[] } | undefined) => ({
         entries: old?.entries ?? PLACEHOLDER_ENTRIES,
         settings,
+        events: old?.events ?? [],
       }));
     },
     [queryClient]
+  );
+
+  const saveOneTimeEvents = useCallback(
+    async (events: OneTimeEvent[]) => {
+      setOneTimeEvents(events);
+      await AsyncStorage.setItem(ONE_TIME_EVENTS_KEY, JSON.stringify(events));
+      queryClient.setQueryData(['scheduleData'], (old: { entries: ScheduleEntry[]; settings: ScheduleTimeSettings; events: OneTimeEvent[] } | undefined) => ({
+        entries: old?.entries ?? PLACEHOLDER_ENTRIES,
+        settings: old?.settings ?? DEFAULT_TIME_SETTINGS,
+        events,
+      }));
+    },
+    [queryClient]
+  );
+
+  const addOneTimeEvent = useCallback(
+    (event: Omit<OneTimeEvent, 'id'>) => {
+      const newEvent: OneTimeEvent = { ...event, id: generateId() };
+      const updated = [...oneTimeEvents, newEvent];
+      saveOneTimeEvents(updated);
+      return newEvent;
+    },
+    [oneTimeEvents, saveOneTimeEvents]
+  );
+
+  const deleteOneTimeEvent = useCallback(
+    (eventId: string) => {
+      const updated = oneTimeEvents.filter((e) => e.id !== eventId);
+      saveOneTimeEvents(updated);
+    },
+    [oneTimeEvents, saveOneTimeEvents]
   );
 
   const addScheduleEntry = useCallback(
@@ -596,5 +635,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
     deleteScheduleEntry,
     updateScheduleEntry,
     saveScheduleTimeSettings,
+    oneTimeEvents,
+    addOneTimeEvent,
+    deleteOneTimeEvent,
   };
 });

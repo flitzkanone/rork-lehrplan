@@ -290,3 +290,16 @@ export interface ScheduleEntry {
   room: string;
   color: string;
 }
+
+export interface OneTimeEvent {
+  id: string;
+  title: string;
+  date: string;
+  isAllDay: boolean;
+  allDayStartTime?: string;
+  allDayEndTime?: string;
+  periods: number[];
+  room: string;
+  color: string;
+  notes: string;
+}

@@ -13,9 +13,10 @@ import {
   TextInput,
   Alert,
   KeyboardAvoidingView,
+  Switch,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronLeft, ChevronRight, Plus, Settings2, X, Trash2, Check, Clock } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Plus, Settings2, X, Trash2, Check, Clock, Calendar, CalendarDays, BookOpen, StickyNote } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useApp } from '@/context/AppContext';
@@ -25,7 +26,7 @@ import {
   generateTimeSlots,
 } from '@/mocks/schedule';
 import type { ScheduleTimeSlot } from '@/mocks/schedule';
-import type { ScheduleEntry, ScheduleTimeSettings } from '@/types';
+import type { ScheduleEntry, ScheduleTimeSettings, OneTimeEvent } from '@/types';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const TIME_COL_WIDTH = 38;
@@ -36,6 +37,17 @@ const BREAK_HEIGHT = 6;
 const HEADER_HEIGHT = 44;
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+
+const EVENT_COLORS = [
+  '#EF4444',
+  '#F59E0B',
+  '#8B5CF6',
+  '#EC4899',
+  '#06B6D4',
+  '#F97316',
+  '#10B981',
+  '#3B82F6',
+];
 
 function getYPosition(period: number, breakAfterPeriods: number[]): number {
   let y = 0;
@@ -62,6 +74,13 @@ function getISOWeekNumber(date: Date): number {
   d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
   const week1 = new Date(d.getFullYear(), 0, 4);
   return 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
+}
+
+function formatDateStr(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 const LessonCard = React.memo(({
@@ -103,6 +122,48 @@ const LessonCard = React.memo(({
   );
 });
 
+const EventCard = React.memo(({
+  event,
+  top,
+  height,
+  onLongPress,
+}: {
+  event: OneTimeEvent;
+  top: number;
+  height: number;
+  onLongPress: () => void;
+}) => {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onLongPress={onLongPress}
+      delayLongPress={400}
+      style={[
+        styles.eventCard,
+        {
+          position: 'absolute' as const,
+          top: top + 1,
+          height: height - 2,
+          left: 1,
+          width: DAY_COL_WIDTH - 2,
+          borderColor: event.color,
+        },
+      ]}
+    >
+      <View style={[styles.accentBar, { backgroundColor: event.color }]} />
+      <View style={styles.cardContent}>
+        <View style={styles.eventIconRow}>
+          <CalendarDays size={7} color={event.color} strokeWidth={2.5} />
+          <Text style={[styles.cardClass, { color: event.color }]} numberOfLines={1}>{event.title}</Text>
+        </View>
+        {height > 30 && event.room ? (
+          <Text style={styles.cardRoom} numberOfLines={1}>{event.room}</Text>
+        ) : null}
+      </View>
+    </TouchableOpacity>
+  );
+});
+
 export default function ScheduleScreen() {
   const insets = useSafeAreaInsets();
   const {
@@ -111,6 +172,9 @@ export default function ScheduleScreen() {
     addScheduleEntry,
     deleteScheduleEntry,
     saveScheduleTimeSettings,
+    oneTimeEvents,
+    addOneTimeEvent,
+    deleteOneTimeEvent,
     data,
   } = useApp();
 
@@ -118,9 +182,12 @@ export default function ScheduleScreen() {
   const timeScrollRef = useRef<ScrollView>(null);
   const [gridAreaHeight, setGridAreaHeight] = useState<number>(0);
 
+  const [showActionSheet, setShowActionSheet] = useState<boolean>(false);
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
+  const [showEventModal, setShowEventModal] = useState<boolean>(false);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [deleteType, setDeleteType] = useState<'entry' | 'event'>('entry');
 
   const [newSubject, setNewSubject] = useState<string>('');
   const [newClassName, setNewClassName] = useState<string>('');
@@ -128,6 +195,16 @@ export default function ScheduleScreen() {
   const [newColor, setNewColor] = useState<string>(SCHEDULE_COLORS[0]);
   const [newDayIndex, setNewDayIndex] = useState<number>(0);
   const [newPeriods, setNewPeriods] = useState<number[]>([]);
+
+  const [eventTitle, setEventTitle] = useState<string>('');
+  const [eventDate, setEventDate] = useState<string>('');
+  const [eventIsAllDay, setEventIsAllDay] = useState<boolean>(false);
+  const [eventAllDayStart, setEventAllDayStart] = useState<string>('08:00');
+  const [eventAllDayEnd, setEventAllDayEnd] = useState<string>('15:30');
+  const [eventPeriods, setEventPeriods] = useState<number[]>([]);
+  const [eventRoom, setEventRoom] = useState<string>('');
+  const [eventColor, setEventColor] = useState<string>(EVENT_COLORS[0]);
+  const [eventNotes, setEventNotes] = useState<string>('');
 
   const [tempStartTime, setTempStartTime] = useState<string>(scheduleTimeSettings.lessonStartTime);
   const [tempDuration, setTempDuration] = useState<string>(String(scheduleTimeSettings.lessonDuration));
@@ -173,13 +250,41 @@ export default function ScheduleScreen() {
     [today]
   );
 
+  const eventsForWeek = useMemo(() => {
+    const map: Record<number, OneTimeEvent[]> = {};
+    for (let i = 0; i < 5; i++) {
+      const dateStr = formatDateStr(weekData.dates[i]);
+      map[i] = oneTimeEvents.filter((e) => e.date === dateStr);
+    }
+    return map;
+  }, [oneTimeEvents, weekData.dates]);
+
   const entriesByDay = useMemo(() => {
     const map: Record<number, ScheduleEntry[]> = {};
     for (let i = 0; i < 5; i++) {
-      map[i] = scheduleEntries.filter((e) => e.dayIndex === i);
+      const dayEvents = eventsForWeek[i] || [];
+      const allDayEvent = dayEvents.find((e) => e.isAllDay);
+
+      if (allDayEvent) {
+        map[i] = [];
+      } else {
+        const blockedPeriods = new Set<number>();
+        dayEvents.forEach((evt) => {
+          evt.periods.forEach((p) => blockedPeriods.add(p));
+        });
+
+        map[i] = scheduleEntries
+          .filter((e) => e.dayIndex === i)
+          .filter((e) => {
+            for (let p = e.periodStart; p <= e.periodEnd; p++) {
+              if (blockedPeriods.has(p)) return false;
+            }
+            return true;
+          });
+      }
     }
     return map;
-  }, [scheduleEntries]);
+  }, [scheduleEntries, eventsForWeek]);
 
   const handlePrevWeek = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -207,6 +312,16 @@ export default function ScheduleScreen() {
   const handleDeleteEntry = useCallback(
     (id: string) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setDeleteType('entry');
+      setShowDeleteConfirm(id);
+    },
+    []
+  );
+
+  const handleDeleteEvent = useCallback(
+    (id: string) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setDeleteType('event');
       setShowDeleteConfirm(id);
     },
     []
@@ -214,10 +329,14 @@ export default function ScheduleScreen() {
 
   const confirmDelete = useCallback(() => {
     if (showDeleteConfirm) {
-      deleteScheduleEntry(showDeleteConfirm);
+      if (deleteType === 'entry') {
+        deleteScheduleEntry(showDeleteConfirm);
+      } else {
+        deleteOneTimeEvent(showDeleteConfirm);
+      }
       setShowDeleteConfirm(null);
     }
-  }, [showDeleteConfirm, deleteScheduleEntry]);
+  }, [showDeleteConfirm, deleteType, deleteScheduleEntry, deleteOneTimeEvent]);
 
   const resetAddForm = useCallback(() => {
     setNewSubject('');
@@ -228,14 +347,50 @@ export default function ScheduleScreen() {
     setNewPeriods([]);
   }, []);
 
-  const handleOpenAddModal = useCallback(() => {
+  const resetEventForm = useCallback(() => {
+    setEventTitle('');
+    setEventDate('');
+    setEventIsAllDay(false);
+    setEventAllDayStart('08:00');
+    setEventAllDayEnd('15:30');
+    setEventPeriods([]);
+    setEventRoom('');
+    setEventColor(EVENT_COLORS[0]);
+    setEventNotes('');
+  }, []);
+
+  const handlePlusPress = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowActionSheet(true);
+  }, []);
+
+  const handleChooseRegular = useCallback(() => {
+    setShowActionSheet(false);
     resetAddForm();
     setShowAddModal(true);
   }, [resetAddForm]);
 
+  const handleChooseEvent = useCallback(() => {
+    setShowActionSheet(false);
+    resetEventForm();
+    const todayStr = formatDateStr(today);
+    setEventDate(todayStr);
+    setShowEventModal(true);
+  }, [resetEventForm, today]);
+
   const handleTogglePeriod = useCallback((period: number) => {
     Haptics.selectionAsync();
     setNewPeriods((prev) => {
+      if (prev.includes(period)) {
+        return prev.filter((p) => p !== period);
+      }
+      return [...prev, period].sort((a, b) => a - b);
+    });
+  }, []);
+
+  const handleToggleEventPeriod = useCallback((period: number) => {
+    Haptics.selectionAsync();
+    setEventPeriods((prev) => {
       if (prev.includes(period)) {
         return prev.filter((p) => p !== period);
       }
@@ -285,6 +440,54 @@ export default function ScheduleScreen() {
     setShowAddModal(false);
     resetAddForm();
   }, [newSubject, newClassName, newRoom, newColor, newDayIndex, newPeriods, addScheduleEntry, resetAddForm]);
+
+  const handleAddEvent = useCallback(() => {
+    if (!eventTitle.trim()) {
+      Alert.alert('Fehler', 'Bitte geben Sie einen Titel ein.');
+      return;
+    }
+    if (!eventDate) {
+      Alert.alert('Fehler', 'Bitte wählen Sie ein Datum.');
+      return;
+    }
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(eventDate)) {
+      Alert.alert('Fehler', 'Bitte geben Sie ein gültiges Datum ein (JJJJ-MM-TT).');
+      return;
+    }
+    if (!eventIsAllDay && eventPeriods.length === 0) {
+      Alert.alert('Fehler', 'Bitte wählen Sie Stunden oder „Ganztägig".');
+      return;
+    }
+    if (eventIsAllDay) {
+      const timeRegex = /^\d{2}:\d{2}$/;
+      if (!timeRegex.test(eventAllDayStart) || !timeRegex.test(eventAllDayEnd)) {
+        Alert.alert('Fehler', 'Bitte geben Sie gültige Zeiten ein (HH:MM).');
+        return;
+      }
+    }
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    const periods = eventIsAllDay
+      ? Array.from({ length: scheduleTimeSettings.maxPeriods }, (_, i) => i)
+      : eventPeriods;
+
+    addOneTimeEvent({
+      title: eventTitle.trim(),
+      date: eventDate,
+      isAllDay: eventIsAllDay,
+      allDayStartTime: eventIsAllDay ? eventAllDayStart : undefined,
+      allDayEndTime: eventIsAllDay ? eventAllDayEnd : undefined,
+      periods,
+      room: eventRoom.trim(),
+      color: eventColor,
+      notes: eventNotes.trim(),
+    });
+
+    setShowEventModal(false);
+    resetEventForm();
+  }, [eventTitle, eventDate, eventIsAllDay, eventAllDayStart, eventAllDayEnd, eventPeriods, eventRoom, eventColor, eventNotes, scheduleTimeSettings.maxPeriods, addOneTimeEvent, resetEventForm]);
 
   const handleOpenSettings = useCallback(() => {
     setTempStartTime(scheduleTimeSettings.lessonStartTime);
@@ -392,6 +595,7 @@ export default function ScheduleScreen() {
   const renderDayColumn = useCallback(
     (dayIndex: number) => {
       const entries = entriesByDay[dayIndex] || [];
+      const dayEvents = eventsForWeek[dayIndex] || [];
       const isTodayCol = isToday(weekData.dates[dayIndex]);
 
       return (
@@ -449,10 +653,40 @@ export default function ScheduleScreen() {
               />
             );
           })}
+          {dayEvents.map((evt) => {
+            if (evt.isAllDay) {
+              const top = 0;
+              const height = totalGridHeight;
+              return (
+                <EventCard
+                  key={evt.id}
+                  event={evt}
+                  top={top}
+                  height={height}
+                  onLongPress={() => handleDeleteEvent(evt.id)}
+                />
+              );
+            }
+            const sortedPeriods = [...evt.periods].sort((a, b) => a - b);
+            if (sortedPeriods.length === 0) return null;
+            const pStart = sortedPeriods[0];
+            const pEnd = sortedPeriods[sortedPeriods.length - 1];
+            const top = getYPosition(pStart, breakAfterPeriods);
+            const height = getCardHeight(pStart, pEnd, breakAfterPeriods);
+            return (
+              <EventCard
+                key={evt.id}
+                event={evt}
+                top={top}
+                height={height}
+                onLongPress={() => handleDeleteEvent(evt.id)}
+              />
+            );
+          })}
         </View>
       );
     },
-    [entriesByDay, isToday, weekData.dates, totalGridHeight, timeSlots, breakAfterPeriods, scheduleTimeSettings.maxPeriods, handleDeleteEntry]
+    [entriesByDay, eventsForWeek, isToday, weekData.dates, totalGridHeight, timeSlots, breakAfterPeriods, scheduleTimeSettings.maxPeriods, handleDeleteEntry, handleDeleteEvent]
   );
 
   return (
@@ -469,7 +703,7 @@ export default function ScheduleScreen() {
             <Settings2 size={18} color={Colors.text} strokeWidth={1.8} />
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={handleOpenAddModal}
+            onPress={handlePlusPress}
             style={styles.headerBtnPrimary}
             activeOpacity={0.5}
             testID="schedule-add"
@@ -547,6 +781,56 @@ export default function ScheduleScreen() {
         </View>
       </View>
 
+      {/* Action Sheet */}
+      <Modal visible={showActionSheet} transparent animationType="fade">
+        <TouchableOpacity
+          style={styles.actionSheetOverlay}
+          activeOpacity={1}
+          onPress={() => setShowActionSheet(false)}
+        >
+          <View style={styles.actionSheetContent}>
+            <View style={styles.actionSheetHandle} />
+            <Text style={styles.actionSheetTitle}>Neuen Eintrag erstellen</Text>
+
+            <TouchableOpacity
+              style={styles.actionSheetOption}
+              activeOpacity={0.6}
+              onPress={handleChooseRegular}
+            >
+              <View style={[styles.actionSheetIcon, { backgroundColor: Colors.primaryLight }]}>
+                <BookOpen size={20} color={Colors.text} strokeWidth={1.8} />
+              </View>
+              <View style={styles.actionSheetOptionText}>
+                <Text style={styles.actionSheetOptionTitle}>Reguläre Stunde</Text>
+                <Text style={styles.actionSheetOptionDesc}>Wöchentlich wiederkehrende Unterrichtsstunde</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionSheetOption}
+              activeOpacity={0.6}
+              onPress={handleChooseEvent}
+            >
+              <View style={[styles.actionSheetIcon, { backgroundColor: '#FEF3C7' }]}>
+                <Calendar size={20} color="#D97706" strokeWidth={1.8} />
+              </View>
+              <View style={styles.actionSheetOptionText}>
+                <Text style={styles.actionSheetOptionTitle}>Einmaliges Ereignis</Text>
+                <Text style={styles.actionSheetOptionDesc}>Ausflug, Konferenz, Fortbildung etc.</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionSheetCancel}
+              activeOpacity={0.6}
+              onPress={() => setShowActionSheet(false)}
+            >
+              <Text style={styles.actionSheetCancelText}>Abbrechen</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Delete Confirmation */}
       <Modal visible={showDeleteConfirm !== null} transparent animationType="fade">
         <View style={styles.modalOverlay}>
@@ -571,7 +855,7 @@ export default function ScheduleScreen() {
         </View>
       </Modal>
 
-      {/* Add Lesson Modal */}
+      {/* Add Regular Lesson Modal */}
       <Modal visible={showAddModal} transparent animationType="slide">
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -672,6 +956,148 @@ export default function ScheduleScreen() {
             </ScrollView>
 
             <TouchableOpacity style={styles.saveBtn} onPress={handleAddEntry} activeOpacity={0.7}>
+              <Text style={styles.saveBtnText}>Hinzufügen</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Add One-Time Event Modal */}
+      <Modal visible={showEventModal} transparent animationType="slide">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={[styles.modalContent, styles.addModalContent]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Einmaliges Ereignis</Text>
+              <TouchableOpacity onPress={() => setShowEventModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <X size={20} color={Colors.textSecondary} strokeWidth={1.7} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.addFormScroll}>
+              <Text style={styles.fieldLabel}>Titel</Text>
+              <TextInput
+                style={styles.input}
+                value={eventTitle}
+                onChangeText={setEventTitle}
+                placeholder="z.B. Wandertag, Konferenz"
+                placeholderTextColor={Colors.textLight}
+              />
+
+              <Text style={styles.fieldLabel}>Datum</Text>
+              <View style={styles.timeInputRow}>
+                <Calendar size={16} color={Colors.textSecondary} strokeWidth={1.7} />
+                <TextInput
+                  style={[styles.input, styles.timeInput]}
+                  value={eventDate}
+                  onChangeText={setEventDate}
+                  placeholder="JJJJ-MM-TT"
+                  placeholderTextColor={Colors.textLight}
+                  maxLength={10}
+                />
+              </View>
+
+              <View style={styles.allDayRow}>
+                <Text style={styles.fieldLabel}>Ganztägig</Text>
+                <Switch
+                  value={eventIsAllDay}
+                  onValueChange={(val) => {
+                    Haptics.selectionAsync();
+                    setEventIsAllDay(val);
+                  }}
+                  trackColor={{ false: Colors.inputBg, true: Colors.text }}
+                  thumbColor={Colors.white}
+                />
+              </View>
+
+              {eventIsAllDay ? (
+                <View>
+                  <Text style={styles.fieldLabel}>Startzeit</Text>
+                  <View style={styles.timeInputRow}>
+                    <Clock size={16} color={Colors.textSecondary} strokeWidth={1.7} />
+                    <TextInput
+                      style={[styles.input, styles.timeInput]}
+                      value={eventAllDayStart}
+                      onChangeText={setEventAllDayStart}
+                      placeholder="08:00"
+                      placeholderTextColor={Colors.textLight}
+                      keyboardType="numbers-and-punctuation"
+                      maxLength={5}
+                    />
+                  </View>
+                  <Text style={styles.fieldLabel}>Endzeit</Text>
+                  <View style={styles.timeInputRow}>
+                    <Clock size={16} color={Colors.textSecondary} strokeWidth={1.7} />
+                    <TextInput
+                      style={[styles.input, styles.timeInput]}
+                      value={eventAllDayEnd}
+                      onChangeText={setEventAllDayEnd}
+                      placeholder="15:30"
+                      placeholderTextColor={Colors.textLight}
+                      keyboardType="numbers-and-punctuation"
+                      maxLength={5}
+                    />
+                  </View>
+                </View>
+              ) : (
+                <View>
+                  <Text style={styles.fieldLabel}>Stunden</Text>
+                  <View style={styles.periodGrid}>
+                    {timeSlots.map((slot) => {
+                      const sel = eventPeriods.includes(slot.period);
+                      return (
+                        <TouchableOpacity
+                          key={slot.period}
+                          style={[styles.periodBtn, sel && styles.periodBtnActive]}
+                          onPress={() => handleToggleEventPeriod(slot.period)}
+                        >
+                          <Text style={[styles.periodBtnNum, sel && styles.periodBtnNumActive]}>{slot.period + 1}</Text>
+                          <Text style={[styles.periodBtnTime, sel && styles.periodBtnTimeActive]}>{slot.startTime}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
+              <Text style={styles.fieldLabel}>Raum / Ort</Text>
+              <TextInput
+                style={styles.input}
+                value={eventRoom}
+                onChangeText={setEventRoom}
+                placeholder="z.B. Aula, Museum"
+                placeholderTextColor={Colors.textLight}
+              />
+
+              <Text style={styles.fieldLabel}>Farbe</Text>
+              <View style={styles.colorRow}>
+                {EVENT_COLORS.map((c) => (
+                  <TouchableOpacity
+                    key={c}
+                    style={[styles.colorDot, { backgroundColor: c }, eventColor === c && styles.colorDotActive]}
+                    onPress={() => { Haptics.selectionAsync(); setEventColor(c); }}
+                  >
+                    {eventColor === c && <Check size={12} color={Colors.white} strokeWidth={3} />}
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.fieldLabel}>Notizen</Text>
+              <TextInput
+                style={[styles.input, styles.notesInput]}
+                value={eventNotes}
+                onChangeText={setEventNotes}
+                placeholder="Details zum Ereignis..."
+                placeholderTextColor={Colors.textLight}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
+            </ScrollView>
+
+            <TouchableOpacity style={styles.saveBtn} onPress={handleAddEvent} activeOpacity={0.7}>
               <Text style={styles.saveBtnText}>Hinzufügen</Text>
             </TouchableOpacity>
           </View>
@@ -954,6 +1380,19 @@ const styles = StyleSheet.create({
       default: {},
     }),
   },
+  eventCard: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderRadius: 4,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderStyle: 'dashed' as const,
+  },
+  eventIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
   accentBar: {
     width: 3,
   },
@@ -978,6 +1417,75 @@ const styles = StyleSheet.create({
     fontSize: 8,
     fontWeight: '400' as const,
     color: Colors.textLight,
+  },
+  actionSheetOverlay: {
+    flex: 1,
+    backgroundColor: Colors.overlay,
+    justifyContent: 'flex-end',
+  },
+  actionSheetContent: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+  },
+  actionSheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.divider,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  actionSheetTitle: {
+    fontSize: 18,
+    fontWeight: '700' as const,
+    color: Colors.text,
+    marginBottom: 16,
+  },
+  actionSheetOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+    gap: 14,
+    borderBottomWidth: 0.5,
+    borderBottomColor: Colors.divider,
+  },
+  actionSheetIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionSheetOptionText: {
+    flex: 1,
+  },
+  actionSheetOptionTitle: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+    color: Colors.text,
+  },
+  actionSheetOptionDesc: {
+    fontSize: 12,
+    fontWeight: '400' as const,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  actionSheetCancel: {
+    marginTop: 12,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: Colors.inputBg,
+    alignItems: 'center',
+  },
+  actionSheetCancelText: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+    color: Colors.text,
   },
   modalOverlay: {
     flex: 1,
@@ -1030,6 +1538,10 @@ const styles = StyleSheet.create({
     color: Colors.text,
     fontWeight: '500' as const,
   },
+  notesInput: {
+    minHeight: 72,
+    paddingTop: 12,
+  },
   timeInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1037,6 +1549,12 @@ const styles = StyleSheet.create({
   },
   timeInput: {
     flex: 1,
+  },
+  allDayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 14,
   },
   chipRow: {
     flexDirection: 'row',

@@ -62,28 +62,4 @@ export function generateTimeSlots(settings: ScheduleTimeSettings): ScheduleTimeS
   return slots;
 }
 
-export const PLACEHOLDER_ENTRIES: ScheduleEntry[] = [
-  { id: '1', dayIndex: 0, periodStart: 1, periodEnd: 2, className: '9a', subject: 'Ma', room: 'R317', color: '#3B82F6' },
-  { id: '2', dayIndex: 0, periodStart: 3, periodEnd: 3, className: '7b', subject: 'Bi', room: 'R319', color: '#10B981' },
-  { id: '3', dayIndex: 0, periodStart: 5, periodEnd: 5, className: '10c', subject: 'En', room: 'R111', color: '#F59E0B' },
-  { id: '4', dayIndex: 0, periodStart: 6, periodEnd: 6, className: '8a', subject: 'De', room: 'R111', color: '#EF4444' },
-
-  { id: '5', dayIndex: 1, periodStart: 0, periodEnd: 0, className: '8a', subject: 'De', room: 'R111', color: '#EF4444' },
-  { id: '6', dayIndex: 1, periodStart: 1, periodEnd: 2, className: '10c', subject: 'Ma', room: 'R317', color: '#F59E0B' },
-  { id: '7', dayIndex: 1, periodStart: 3, periodEnd: 3, className: '7b', subject: 'EVA', room: 'R111', color: '#10B981' },
-  { id: '8', dayIndex: 1, periodStart: 7, periodEnd: 8, className: '9a', subject: 'NaWi', room: 'R208', color: '#3B82F6' },
-
-  { id: '9', dayIndex: 2, periodStart: 1, periodEnd: 2, className: '9a', subject: 'NaWi', room: 'R208', color: '#3B82F6' },
-  { id: '10', dayIndex: 2, periodStart: 3, periodEnd: 4, className: '7b', subject: 'E_WP', room: 'R111', color: '#10B981' },
-  { id: '11', dayIndex: 2, periodStart: 5, periodEnd: 5, className: '10c', subject: 'En', room: 'R317', color: '#F59E0B' },
-  { id: '12', dayIndex: 2, periodStart: 7, periodEnd: 8, className: '8a', subject: 'WAK', room: 'R319', color: '#EF4444' },
-
-  { id: '13', dayIndex: 3, periodStart: 2, periodEnd: 2, className: '7b', subject: 'Gewi', room: 'R111', color: '#10B981' },
-  { id: '14', dayIndex: 3, periodStart: 3, periodEnd: 4, className: '9a', subject: 'Gewi', room: 'R111', color: '#3B82F6' },
-  { id: '15', dayIndex: 3, periodStart: 5, periodEnd: 5, className: '10c', subject: 'Ma', room: 'R111', color: '#F59E0B' },
-
-  { id: '16', dayIndex: 4, periodStart: 1, periodEnd: 2, className: '10c', subject: 'Ph', room: 'R317', color: '#F59E0B' },
-  { id: '17', dayIndex: 4, periodStart: 3, periodEnd: 4, className: '9a', subject: 'Ch', room: 'R208', color: '#3B82F6' },
-  { id: '18', dayIndex: 4, periodStart: 5, periodEnd: 5, className: '8a', subject: 'Ch', room: 'R208', color: '#EF4444' },
-  { id: '19', dayIndex: 4, periodStart: 7, periodEnd: 8, className: '7b', subject: 'Bk', room: 'R115', color: '#10B981' },
-];
+export const PLACEHOLDER_ENTRIES: ScheduleEntry[] = [];
