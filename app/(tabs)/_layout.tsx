@@ -1,7 +1,7 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
-import { BookOpen, Users, BarChart3, Settings } from 'lucide-react-native';
+import { BookOpen, CalendarDays, Users, BarChart3, Settings } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 
 export default function TabLayout() {
@@ -39,6 +39,13 @@ export default function TabLayout() {
         options={{
           title: 'Unterricht',
           tabBarIcon: ({ color, size }) => <BookOpen size={size - 3} color={color} strokeWidth={1.7} />,
+        }}
+      />
+      <Tabs.Screen
+        name="schedule"
+        options={{
+          title: 'Stundenplan',
+          tabBarIcon: ({ color, size }) => <CalendarDays size={size - 3} color={color} strokeWidth={1.7} />,
         }}
       />
       <Tabs.Screen
