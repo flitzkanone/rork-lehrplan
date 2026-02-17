@@ -421,10 +421,6 @@ export default function OnboardingScreen() {
       outputRange: ['0%', '100%'],
     });
 
-    const percentText = progressAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: ['0%', '100%'],
-    });
 
     return (
       <Animated.View style={[styles.loadingRoot, { opacity: loadingFadeAnim }]}>
@@ -437,9 +433,7 @@ export default function OnboardingScreen() {
           <View style={styles.progressTrack}>
             <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
           </View>
-          <Animated.Text style={styles.loadingPercent}>
-            {percentText}
-          </Animated.Text>
+
         </View>
       </Animated.View>
     );
@@ -1707,10 +1701,5 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     borderRadius: 3,
   },
-  loadingPercent: {
-    fontSize: 13,
-    color: Colors.textLight,
-    marginTop: 12,
-    fontVariant: ['tabular-nums'] as any,
-  },
+
 });

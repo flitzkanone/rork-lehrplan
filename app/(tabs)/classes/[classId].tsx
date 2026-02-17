@@ -37,8 +37,8 @@ export default function ClassDetailScreen() {
   };
 
   const handleAddStudent = useCallback(() => {
-    if (!firstName.trim() || !lastName.trim()) {
-      Alert.alert('Fehler', 'Vor- und Nachname sind erforderlich.');
+    if (!firstName.trim()) {
+      Alert.alert('Fehler', 'Vorname ist erforderlich.');
       return;
     }
     if (!classId) return;
@@ -50,8 +50,8 @@ export default function ClassDetailScreen() {
 
   const handleEditStudent = useCallback(() => {
     if (!editingStudent || !classId) return;
-    if (!firstName.trim() || !lastName.trim()) {
-      Alert.alert('Fehler', 'Vor- und Nachname sind erforderlich.');
+    if (!firstName.trim()) {
+      Alert.alert('Fehler', 'Vorname ist erforderlich.');
       return;
     }
     updateStudent(classId, editingStudent.id, {
