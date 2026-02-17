@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "LehrPlan",
-    "slug": "lehrplan-x5n55sp",
+    "name": "LehrPlan-v8",
+    "slug": "lehrplan-v8",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -15,14 +15,14 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "app.rork.lehrplan-x5n55sp"
+      "bundleIdentifier": "app.rork.lehrplan-v8"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "app.rork.lehrplan_x5n55sp"
+      "package": "app.rork.lehrplan-v8"
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
