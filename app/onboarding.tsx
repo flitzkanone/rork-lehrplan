@@ -423,7 +423,7 @@ export default function OnboardingScreen() {
 
     const percentText = progressAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: ['0', '100'],
+      outputRange: ['0%', '100%'],
     });
 
     return (
@@ -438,10 +438,7 @@ export default function OnboardingScreen() {
             <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
           </View>
           <Animated.Text style={styles.loadingPercent}>
-            {percentText.interpolate({
-              inputRange: [0, 100],
-              outputRange: ['0%', '100%'],
-            })}
+            {percentText}
           </Animated.Text>
         </View>
       </Animated.View>
