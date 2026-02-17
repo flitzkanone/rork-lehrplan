@@ -29,6 +29,13 @@ export interface ParticipationEntry {
   sessionId: string;
 }
 
+export type HomeworkStatus = 'done' | 'late' | 'missing';
+
+export interface HomeworkRecord {
+  studentId: string;
+  status: HomeworkStatus;
+}
+
 export interface LessonSession {
   id: string;
   classId: string;
@@ -36,6 +43,7 @@ export interface LessonSession {
   startedAt: string;
   ratings: Record<string, ParticipationRating>;
   reasons: Record<string, ParticipationReason>;
+  homework: Record<string, HomeworkStatus>;
 }
 
 export interface TeacherProfile {

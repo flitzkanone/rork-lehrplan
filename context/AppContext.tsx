@@ -11,6 +11,7 @@ import type {
   TeacherProfile,
   ParticipationRating,
   ParticipationReason,
+  HomeworkStatus,
   BackupMetadata,
   ScheduleTimeSettings,
   ScheduleEntry,
@@ -304,6 +305,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
         startedAt: new Date().toISOString(),
         ratings: {},
         reasons: {},
+        homework: {},
       };
       save((prev) => {
         const schoolClass = prev.classes.find((c) => c.id === classId);
@@ -339,6 +341,23 @@ export const [AppProvider, useApp] = createContextHook(() => {
             ...prev.activeSession,
             ratings: newRatings,
             reasons: newReasons,
+          },
+        };
+      });
+    },
+    [save]
+  );
+
+  const rateHomework = useCallback(
+    (studentId: string, status: HomeworkStatus) => {
+      save((prev) => {
+        if (!prev.activeSession) return prev;
+        const newHomework = { ...prev.activeSession.homework, [studentId]: status };
+        return {
+          ...prev,
+          activeSession: {
+            ...prev.activeSession,
+            homework: newHomework,
           },
         };
       });
@@ -669,6 +688,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     deleteStudent,
     startSession,
     rateStudent,
+    rateHomework,
     endSession,
     resetApp,
     recoverFromBackup,

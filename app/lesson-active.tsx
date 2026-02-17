@@ -8,16 +8,15 @@ import {
   Alert,
   Animated,
   Platform,
-  Modal,
   Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Plus, Minus, Circle, CheckCircle, Users, ThumbsUp, HandHelping, EyeOff, Volume2, FileX } from 'lucide-react-native';
+import { Plus, Minus, Circle, CheckCircle, Users, ThumbsUp, HandHelping, EyeOff, Volume2, FileX, BookOpen, Check, X, Clock } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useApp } from '@/context/AppContext';
-import type { ParticipationRating, ParticipationReason, PositiveReason, NegativeReason } from '@/types';
+import type { ParticipationRating, ParticipationReason, HomeworkStatus } from '@/types';
 
 interface ReasonOption {
   reason: ParticipationReason;
@@ -68,6 +67,67 @@ function RatingButton({
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
       <TouchableOpacity
         style={[styles.ratingBtn, { backgroundColor: c.bg, borderColor: active ? c.border : 'transparent' }]}
+        onPress={handlePress}
+        activeOpacity={0.55}
+      >
+        {c.icon}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+function HomeworkButton({
+  status,
+  active,
+  onPress,
+}: {
+  status: HomeworkStatus;
+  active: boolean;
+  onPress: () => void;
+}) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePress = () => {
+    Animated.sequence([
+      Animated.timing(scaleAnim, { toValue: 0.88, duration: 50, useNativeDriver: true }),
+      Animated.timing(scaleAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
+    ]).start();
+    onPress();
+  };
+
+  const config: Record<HomeworkStatus, { bg: string; activeBg: string; border: string; icon: React.ReactNode }> = {
+    'done': {
+      bg: '#F0FDF4',
+      activeBg: '#16A34A',
+      border: '#16A34A',
+      icon: <Check size={16} color={active ? '#FFFFFF' : '#16A34A'} strokeWidth={2.5} />,
+    },
+    'missing': {
+      bg: Colors.negativeLight,
+      activeBg: Colors.negative,
+      border: Colors.negative,
+      icon: <X size={16} color={active ? '#FFFFFF' : Colors.negative} strokeWidth={2.5} />,
+    },
+    'late': {
+      bg: Colors.warningLight,
+      activeBg: '#D97706',
+      border: '#D97706',
+      icon: <Clock size={14} color={active ? '#FFFFFF' : '#D97706'} strokeWidth={2.5} />,
+    },
+  };
+
+  const c = config[status];
+
+  return (
+    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+      <TouchableOpacity
+        style={[
+          styles.homeworkBtn,
+          {
+            backgroundColor: active ? c.activeBg : c.bg,
+            borderColor: active ? c.border : 'transparent',
+          },
+        ]}
         onPress={handlePress}
         activeOpacity={0.55}
       >
@@ -144,12 +204,21 @@ function getReasonLabel(reason: ParticipationReason): string | null {
   return all.find((r) => r.reason === reason)?.label ?? null;
 }
 
+function getHomeworkLabel(status: HomeworkStatus): string {
+  switch (status) {
+    case 'done': return 'Abgegeben';
+    case 'late': return 'Verspätet';
+    case 'missing': return 'Nicht abgegeben';
+  }
+}
+
 export default function LessonActiveScreen() {
   const router = useRouter();
-  const { data, rateStudent, endSession } = useApp();
+  const { data, rateStudent, rateHomework, endSession } = useApp();
   const session = data.activeSession;
   const [openMenuStudentId, setOpenMenuStudentId] = useState<string | null>(null);
   const [openMenuType, setOpenMenuType] = useState<'+' | '-' | null>(null);
+  const [homeworkMode, setHomeworkMode] = useState<boolean>(false);
 
   const currentClass = data.classes.find((c) => c.id === session?.classId);
 
@@ -171,6 +240,59 @@ export default function LessonActiveScreen() {
       ]
     );
   }, [endSession, router]);
+
+  const handleEnterHomeworkMode = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setHomeworkMode(true);
+    setOpenMenuStudentId(null);
+    setOpenMenuType(null);
+  }, []);
+
+  const handleExitHomeworkMode = useCallback(() => {
+    if (!session || !currentClass) {
+      setHomeworkMode(false);
+      return;
+    }
+
+    const homework = session.homework ?? {};
+    const unratedStudents = currentClass.students.filter((s) => !homework[s.id]);
+
+    if (unratedStudents.length > 0) {
+      Alert.alert(
+        'Hausaufgaben beenden?',
+        `${unratedStudents.length} Schüler wurden nicht bewertet. Alle unbewerteten Schüler erhalten ein ✕ (nicht abgegeben).`,
+        [
+          { text: 'Abbrechen', style: 'cancel' },
+          {
+            text: 'Beenden',
+            style: 'destructive',
+            onPress: () => {
+              unratedStudents.forEach((s) => {
+                rateHomework(s.id, 'missing');
+              });
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              setHomeworkMode(false);
+            },
+          },
+        ]
+      );
+    } else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setHomeworkMode(false);
+    }
+  }, [session, currentClass, rateHomework]);
+
+  const handleHomeworkRate = useCallback(
+    (studentId: string, status: HomeworkStatus) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      const currentStatus = session?.homework?.[studentId];
+      if (currentStatus === status) {
+        return;
+      }
+      rateHomework(studentId, status);
+    },
+    [rateHomework, session]
+  );
 
   const handleRatingPress = useCallback(
     (studentId: string, type: ParticipationRating) => {
@@ -225,36 +347,151 @@ export default function LessonActiveScreen() {
   const totalCount = currentClass.students.length;
   const progress = totalCount > 0 ? ratedCount / totalCount : 0;
 
+  const homeworkRated = Object.keys(session.homework ?? {}).length;
+  const homeworkProgress = totalCount > 0 ? homeworkRated / totalCount : 0;
+
   return (
     <View style={styles.root}>
-      {openMenuStudentId && (
+      {openMenuStudentId && !homeworkMode && (
         <Pressable style={styles.backdropOverlay} onPress={handleCloseMenu} />
       )}
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
           <View style={styles.headerTop}>
-            <View>
+            <View style={styles.headerLeft}>
               <Text style={styles.headerTitle}>{currentClass.name}</Text>
               <Text style={styles.headerSubject}>{session.subject}</Text>
             </View>
-            <TouchableOpacity style={styles.endBtn} onPress={handleEndLesson} activeOpacity={0.55}>
-              <CheckCircle size={15} color={Colors.primary} strokeWidth={1.8} />
-              <Text style={styles.endBtnText}>Beenden</Text>
-            </TouchableOpacity>
+
+            {homeworkMode ? (
+              <TouchableOpacity style={styles.homeworkEndBtn} onPress={handleExitHomeworkMode} activeOpacity={0.55}>
+                <BookOpen size={14} color={Colors.negative} strokeWidth={1.8} />
+                <Text style={styles.homeworkEndBtnText}>HA beenden</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.headerActions}>
+                <TouchableOpacity style={styles.homeworkToggleBtn} onPress={handleEnterHomeworkMode} activeOpacity={0.55}>
+                  <BookOpen size={14} color={Colors.text} strokeWidth={1.8} />
+                  <Text style={styles.homeworkToggleBtnText}>Hausaufgaben</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.endBtn} onPress={handleEndLesson} activeOpacity={0.55}>
+                  <CheckCircle size={15} color={Colors.primary} strokeWidth={1.8} />
+                  <Text style={styles.endBtnText}>Beenden</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
-          <View style={styles.progressWrap}>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { flex: progress }]} />
-              {progress < 1 && <View style={{ flex: 1 - progress }} />}
+
+          {homeworkMode ? (
+            <View style={styles.progressWrap}>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, styles.homeworkProgressFill, { flex: homeworkProgress }]} />
+                {homeworkProgress < 1 && <View style={{ flex: 1 - homeworkProgress }} />}
+              </View>
+              <Text style={styles.progressText}>{homeworkRated}/{totalCount}</Text>
             </View>
-            <Text style={styles.progressText}>{ratedCount}/{totalCount}</Text>
-          </View>
+          ) : (
+            <View style={styles.progressWrap}>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, { flex: progress }]} />
+                {progress < 1 && <View style={{ flex: 1 - progress }} />}
+              </View>
+              <Text style={styles.progressText}>{ratedCount}/{totalCount}</Text>
+            </View>
+          )}
+
+          {homeworkMode && (
+            <View style={styles.homeworkLegend}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#16A34A' }]} />
+                <Text style={styles.legendText}>Abgegeben</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#D97706' }]} />
+                <Text style={styles.legendText}>Verspätet</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: Colors.negative }]} />
+                <Text style={styles.legendText}>Fehlt</Text>
+              </View>
+            </View>
+          )}
         </View>
 
         <ScrollView style={styles.list} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
           {currentClass.students
             .sort((a, b) => a.lastName.localeCompare(b.lastName))
             .map((student) => {
+              if (homeworkMode) {
+                const hwStatus = session.homework?.[student.id] as HomeworkStatus | undefined;
+                const hwLabel = hwStatus ? getHomeworkLabel(hwStatus) : null;
+
+                return (
+                  <View key={student.id} style={styles.studentCard}>
+                    <View style={styles.studentRow}>
+                      <View style={styles.studentInfo}>
+                        <View style={[
+                          styles.studentAvatar,
+                          hwStatus === 'done' && styles.avatarHomeworkDone,
+                          hwStatus === 'late' && styles.avatarHomeworkLate,
+                          hwStatus === 'missing' && styles.avatarHomeworkMissing,
+                        ]}>
+                          <Text style={[
+                            styles.avatarText,
+                            hwStatus === 'done' && { color: '#16A34A' },
+                            hwStatus === 'late' && { color: '#D97706' },
+                            hwStatus === 'missing' && styles.avatarTextNegative,
+                          ]}>
+                            {(student.firstName || '?')[0]}{(student.lastName || '?')[0]}
+                          </Text>
+                        </View>
+                        <View style={styles.studentTextWrap}>
+                          <Text style={styles.studentName}>
+                            {student.lastName}{student.lastName ? ', ' : ''}{student.firstName}
+                          </Text>
+                          {hwLabel ? (
+                            <View style={styles.reasonBadgeRow}>
+                              <View style={[
+                                styles.reasonBadge,
+                                hwStatus === 'done' && { backgroundColor: '#F0FDF4' },
+                                hwStatus === 'late' && { backgroundColor: Colors.warningLight },
+                                hwStatus === 'missing' && styles.reasonBadgeNeg,
+                              ]}>
+                                <Text style={[
+                                  styles.reasonBadgeText,
+                                  hwStatus === 'done' && { color: '#16A34A' },
+                                  hwStatus === 'late' && { color: '#D97706' },
+                                  hwStatus === 'missing' && styles.reasonBadgeTextNeg,
+                                ]}>
+                                  {hwLabel}
+                                </Text>
+                              </View>
+                            </View>
+                          ) : null}
+                        </View>
+                      </View>
+                      <View style={styles.ratingRow}>
+                        <HomeworkButton
+                          status="done"
+                          active={hwStatus === 'done'}
+                          onPress={() => handleHomeworkRate(student.id, 'done')}
+                        />
+                        <HomeworkButton
+                          status="late"
+                          active={hwStatus === 'late'}
+                          onPress={() => handleHomeworkRate(student.id, 'late')}
+                        />
+                        <HomeworkButton
+                          status="missing"
+                          active={hwStatus === 'missing'}
+                          onPress={() => handleHomeworkRate(student.id, 'missing')}
+                        />
+                      </View>
+                    </View>
+                  </View>
+                );
+              }
+
               const currentRating = session.ratings[student.id] as ParticipationRating | undefined;
               const currentReason = session.reasons?.[student.id] ?? null;
               const reasonLabel = getReasonLabel(currentReason);
@@ -394,6 +631,9 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 14,
   },
+  headerLeft: {
+    flex: 1,
+  },
   headerTitle: {
     fontSize: 24,
     fontWeight: '700' as const,
@@ -404,6 +644,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textSecondary,
     marginTop: 2,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   endBtn: {
     flexDirection: 'row',
@@ -418,6 +663,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500' as const,
     color: Colors.primary,
+  },
+  homeworkToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: Colors.inputBg,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+  },
+  homeworkToggleBtnText: {
+    fontSize: 13,
+    fontWeight: '500' as const,
+    color: Colors.text,
+  },
+  homeworkEndBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: Colors.negativeLight,
+    borderWidth: 1,
+    borderColor: '#F0D4D0',
+  },
+  homeworkEndBtnText: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: Colors.negative,
   },
   progressWrap: {
     flexDirection: 'row',
@@ -437,12 +714,36 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: Colors.primary,
   },
+  homeworkProgressFill: {
+    backgroundColor: '#16A34A',
+  },
   progressText: {
     fontSize: 12,
     fontWeight: '600' as const,
     color: Colors.textSecondary,
     minWidth: 32,
     textAlign: 'right' as const,
+  },
+  homeworkLegend: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginTop: 10,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendText: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    fontWeight: '500' as const,
   },
   list: {
     flex: 1,
@@ -488,6 +789,21 @@ const styles = StyleSheet.create({
     borderColor: Colors.positive,
   },
   avatarNegative: {
+    backgroundColor: Colors.negativeLight,
+    borderWidth: 1.5,
+    borderColor: Colors.negative,
+  },
+  avatarHomeworkDone: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1.5,
+    borderColor: '#16A34A',
+  },
+  avatarHomeworkLate: {
+    backgroundColor: Colors.warningLight,
+    borderWidth: 1.5,
+    borderColor: '#D97706',
+  },
+  avatarHomeworkMissing: {
     backgroundColor: Colors.negativeLight,
     borderWidth: 1.5,
     borderColor: Colors.negative,
@@ -547,6 +863,14 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   ratingBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  homeworkBtn: {
     width: 36,
     height: 36,
     borderRadius: 11,
