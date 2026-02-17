@@ -26,11 +26,11 @@ export default function LessonScreen() {
   useEffect(() => {
     if (isLoading) return;
     if (!data.onboardingComplete) {
-      router.replace('/onboarding');
+      router.replace('/onboarding' as any);
       return;
     }
     if (!isAuthenticated) {
-      router.replace('/lock');
+      router.replace('/lock' as any);
     }
   }, [isLoading, data.onboardingComplete, isAuthenticated, router]);
 
@@ -48,12 +48,12 @@ export default function LessonScreen() {
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     startSession(selectedClassId, selectedSubject);
-    router.push('/lesson-active');
+    router.push('/lesson-active' as any);
   }, [selectedClassId, selectedSubject, data.classes, startSession, router]);
 
   const handleResumeLesson = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push('/lesson-active');
+    router.push('/lesson-active' as any);
   }, [router]);
 
   if (isLoading || !data.onboardingComplete || !isAuthenticated) {
