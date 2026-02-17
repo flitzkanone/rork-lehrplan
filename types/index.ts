@@ -36,6 +36,16 @@ export interface HomeworkRecord {
   status: HomeworkStatus;
 }
 
+export interface HomeworkEntry {
+  id: string;
+  studentId: string;
+  classId: string;
+  subject: string;
+  status: HomeworkStatus;
+  date: string;
+  sessionId: string;
+}
+
 export interface LessonSession {
   id: string;
   classId: string;
@@ -56,6 +66,7 @@ export interface AppData {
   profile: TeacherProfile;
   classes: SchoolClass[];
   participations: ParticipationEntry[];
+  homeworkEntries: HomeworkEntry[];
   activeSession: LessonSession | null;
   onboardingComplete: boolean;
   pinHash: string;

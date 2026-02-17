@@ -9,7 +9,7 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Search, Filter, TrendingUp, TrendingDown, Minus } from 'lucide-react-native';
+import { Search, Filter, TrendingUp, TrendingDown, Minus, Check, X, Clock } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useApp } from '@/context/AppContext';
 import { StatisticsScreenSkeleton } from '@/components/SkeletonLoader';
@@ -17,16 +17,13 @@ import type { Student } from '@/types';
 
 function MiniProgressBar({ positive, neutral, negative, total }: { positive: number; neutral: number; negative: number; total: number }) {
   if (total === 0) return <View style={barStyles.empty}><Text style={barStyles.emptyText}>Keine Daten</Text></View>;
-  const pPct = (positive / total) * 100;
-  const nPct = (neutral / total) * 100;
-  const negPct = (negative / total) * 100;
 
   return (
     <View style={barStyles.container}>
       <View style={barStyles.barBg}>
-        {pPct > 0 && <View style={[barStyles.segment, { flex: positive, backgroundColor: Colors.positive }]} />}
-        {nPct > 0 && <View style={[barStyles.segment, { flex: neutral, backgroundColor: Colors.neutral }]} />}
-        {negPct > 0 && <View style={[barStyles.segment, { flex: negative, backgroundColor: Colors.negative }]} />}
+        {positive > 0 && <View style={[barStyles.segment, { flex: positive, backgroundColor: Colors.positive }]} />}
+        {neutral > 0 && <View style={[barStyles.segment, { flex: neutral, backgroundColor: Colors.neutral }]} />}
+        {negative > 0 && <View style={[barStyles.segment, { flex: negative, backgroundColor: Colors.negative }]} />}
       </View>
       <View style={barStyles.legend}>
         <View style={barStyles.legendItem}>
@@ -46,11 +43,39 @@ function MiniProgressBar({ positive, neutral, negative, total }: { positive: num
   );
 }
 
+function HomeworkBar({ done, late, missing, total }: { done: number; late: number; missing: number; total: number }) {
+  if (total === 0) return null;
+
+  return (
+    <View style={barStyles.container}>
+      <View style={barStyles.barBg}>
+        {done > 0 && <View style={[barStyles.segment, { flex: done, backgroundColor: '#16A34A' }]} />}
+        {late > 0 && <View style={[barStyles.segment, { flex: late, backgroundColor: '#D97706' }]} />}
+        {missing > 0 && <View style={[barStyles.segment, { flex: missing, backgroundColor: Colors.negative }]} />}
+      </View>
+      <View style={barStyles.legend}>
+        <View style={barStyles.legendItem}>
+          <View style={[barStyles.legendDot, { backgroundColor: '#16A34A' }]} />
+          <Text style={barStyles.legendText}>{done}x Abgegeben</Text>
+        </View>
+        <View style={barStyles.legendItem}>
+          <View style={[barStyles.legendDot, { backgroundColor: '#D97706' }]} />
+          <Text style={barStyles.legendText}>{late}x Verspätet</Text>
+        </View>
+        <View style={barStyles.legendItem}>
+          <View style={[barStyles.legendDot, { backgroundColor: Colors.negative }]} />
+          <Text style={barStyles.legendText}>{missing}x Fehlt</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 const barStyles = StyleSheet.create({
   container: { gap: 6 },
   barBg: { height: 5, borderRadius: 2.5, backgroundColor: Colors.inputBg, flexDirection: 'row', overflow: 'hidden' },
   segment: { height: 5 },
-  legend: { flexDirection: 'row', gap: 16 },
+  legend: { flexDirection: 'row', gap: 12, flexWrap: 'wrap' },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 6, height: 6, borderRadius: 3 },
   legendText: { fontSize: 11, color: Colors.textSecondary, fontWeight: '500' as const },
@@ -101,6 +126,21 @@ export default function StatisticsScreen() {
       return { positive, neutral, negative, total: entries.length };
     },
     [data.participations, filterSubject]
+  );
+
+  const getHomeworkStats = useCallback(
+    (studentId: string) => {
+      const hwEntries = (data.homeworkEntries || []).filter((h) => h.studentId === studentId);
+      let filtered = hwEntries;
+      if (filterSubject) {
+        filtered = filtered.filter((h) => h.subject === filterSubject);
+      }
+      const done = filtered.filter((h) => h.status === 'done').length;
+      const late = filtered.filter((h) => h.status === 'late').length;
+      const missing = filtered.filter((h) => h.status === 'missing').length;
+      return { done, late, missing, total: filtered.length };
+    },
+    [data.homeworkEntries, filterSubject]
   );
 
   if (isLoading) {
@@ -161,6 +201,7 @@ export default function StatisticsScreen() {
         ) : (
           filtered.map((item) => {
             const stats = getStudentStats(item.student.id);
+            const hwStats = getHomeworkStats(item.student.id);
             const trend = stats.total > 0 ? stats.positive - stats.negative : 0;
             return (
               <View key={`${item.classId}-${item.student.id}`} style={styles.card}>
@@ -173,7 +214,7 @@ export default function StatisticsScreen() {
                     </View>
                     <View>
                       <Text style={styles.studentName}>
-                        {item.student.lastName}, {item.student.firstName}
+                        {item.student.lastName}{item.student.lastName ? ', ' : ''}{item.student.firstName}
                       </Text>
                       <Text style={styles.className}>{item.className}</Text>
                     </View>
@@ -192,7 +233,34 @@ export default function StatisticsScreen() {
                     </View>
                   )}
                 </View>
+
+                <View style={styles.sectionLabel}>
+                  <Text style={styles.sectionLabelText}>Mitarbeit</Text>
+                </View>
                 <MiniProgressBar {...stats} />
+
+                <View style={styles.sectionDivider} />
+
+                <View style={styles.sectionLabel}>
+                  <Text style={styles.sectionLabelText}>Hausaufgaben</Text>
+                  {hwStats.total > 0 && (
+                    <View style={styles.hwSummary}>
+                      <View style={styles.hwBadge}>
+                        <Check size={10} color="#16A34A" strokeWidth={2.5} />
+                        <Text style={[styles.hwBadgeText, { color: '#16A34A' }]}>{hwStats.done}</Text>
+                      </View>
+                      <View style={styles.hwBadge}>
+                        <Clock size={10} color="#D97706" strokeWidth={2.5} />
+                        <Text style={[styles.hwBadgeText, { color: '#D97706' }]}>{hwStats.late}</Text>
+                      </View>
+                      <View style={styles.hwBadge}>
+                        <X size={10} color={Colors.negative} strokeWidth={2.5} />
+                        <Text style={[styles.hwBadgeText, { color: Colors.negative }]}>{hwStats.missing}</Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+                <HomeworkBar {...hwStats} />
               </View>
             );
           })
@@ -301,7 +369,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderRadius: 16,
     padding: 16,
-    gap: 14,
+    gap: 10,
     ...Platform.select({
       ios: { shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 1, shadowRadius: 8 },
       android: { elevation: 1 },
@@ -347,5 +415,36 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  sectionLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  sectionLabelText: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+    color: Colors.textSecondary,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.5,
+  },
+  sectionDivider: {
+    height: 1,
+    backgroundColor: Colors.divider,
+    marginVertical: 2,
+  },
+  hwSummary: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  hwBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  hwBadgeText: {
+    fontSize: 11,
+    fontWeight: '600' as const,
   },
 });

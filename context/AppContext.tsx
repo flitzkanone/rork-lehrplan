@@ -7,6 +7,7 @@ import type {
   SchoolClass,
   Student,
   ParticipationEntry,
+  HomeworkEntry,
   LessonSession,
   TeacherProfile,
   ParticipationRating,
@@ -41,6 +42,7 @@ const defaultData: AppData = {
   profile: { name: '', school: '', subjects: [] },
   classes: [],
   participations: [],
+  homeworkEntries: [],
   activeSession: null,
   onboardingComplete: false,
   pinHash: '',
@@ -384,9 +386,22 @@ export const [AppProvider, useApp] = createContextHook(() => {
         sessionId: session.id,
       }));
 
+      const newHomeworkEntries: HomeworkEntry[] = Object.entries(session.homework || {}).map(
+        ([studentId, status]) => ({
+          id: generateId(),
+          studentId,
+          classId: session.classId,
+          subject: session.subject,
+          status: status as HomeworkStatus,
+          date: session.startedAt,
+          sessionId: session.id,
+        })
+      );
+
       return {
         ...prev,
         participations: [...prev.participations, ...newEntries],
+        homeworkEntries: [...(prev.homeworkEntries || []), ...newHomeworkEntries],
         activeSession: null,
       };
     });

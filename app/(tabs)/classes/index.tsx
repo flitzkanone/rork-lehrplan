@@ -9,6 +9,7 @@ import {
   Alert,
   Modal,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -25,15 +26,19 @@ export default function ClassesScreen() {
   const { data, addClass, deleteClass, isLoading } = useApp();
   const [showModal, setShowModal] = useState<boolean>(false);
   const [newClassName, setNewClassName] = useState<string>('');
+  const [isCreating, setIsCreating] = useState<boolean>(false);
 
-  const handleCreate = useCallback(() => {
+  const handleCreate = useCallback(async () => {
     if (!newClassName.trim()) {
       Alert.alert('Fehler', 'Bitte geben Sie einen Klassennamen ein.');
       return;
     }
+    setIsCreating(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    await new Promise<void>((resolve) => setTimeout(resolve, 600));
     addClass(newClassName.trim());
     setNewClassName('');
+    setIsCreating(false);
     setShowModal(false);
   }, [newClassName, addClass]);
 
@@ -129,9 +134,14 @@ export default function ClassesScreen() {
       <Modal visible={showModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
+            {isCreating && (
+              <View style={styles.creatingOverlay}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+              </View>
+            )}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Neue Klasse</Text>
-              <TouchableOpacity onPress={() => setShowModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <TouchableOpacity onPress={() => { if (!isCreating) setShowModal(false); }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <X size={20} color={Colors.textSecondary} strokeWidth={1.7} />
               </TouchableOpacity>
             </View>
@@ -142,9 +152,15 @@ export default function ClassesScreen() {
               placeholder="z.B. 8a, 10b, Q1"
               placeholderTextColor={Colors.textLight}
               autoFocus
+              editable={!isCreating}
               testID="input-class-name"
             />
-            <TouchableOpacity style={styles.modalBtn} onPress={handleCreate} activeOpacity={0.7}>
+            <TouchableOpacity
+              style={[styles.modalBtn, isCreating && styles.modalBtnDisabled]}
+              onPress={handleCreate}
+              activeOpacity={0.7}
+              disabled={isCreating}
+            >
               <Text style={styles.modalBtnText}>Erstellen</Text>
             </TouchableOpacity>
           </View>
@@ -296,6 +312,17 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderRadius: 12,
     alignItems: 'center',
+  },
+  modalBtnDisabled: {
+    opacity: 0.5,
+  },
+  creatingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    zIndex: 10,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalBtnText: {
     fontSize: 16,
