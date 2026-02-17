@@ -7,13 +7,13 @@ import {
   Dimensions,
   Platform,
   TouchableOpacity,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
   Modal,
   TextInput,
   Alert,
   KeyboardAvoidingView,
   Switch,
+  Animated,
+  PanResponder,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronRight, Plus, Settings2, X, Trash2, Check, Clock, Calendar, CalendarDays, BookOpen, StickyNote, RefreshCw } from 'lucide-react-native';
@@ -32,8 +32,8 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 const TIME_COL_WIDTH = 38;
 const DAY_COL_WIDTH = Math.floor((SCREEN_WIDTH - TIME_COL_WIDTH) / 5);
 const TOTAL_GRID_WIDTH = DAY_COL_WIDTH * 5;
-const ROW_HEIGHT = 52;
-const BREAK_HEIGHT = 6;
+const DEFAULT_ROW_HEIGHT = 52;
+const DEFAULT_BREAK_HEIGHT = 6;
 const HEADER_HEIGHT = 44;
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
@@ -49,23 +49,23 @@ const EVENT_COLORS = [
   '#3B82F6',
 ];
 
-function getYPosition(period: number, breakAfterPeriods: number[]): number {
+function getYPosition(period: number, breakAfterPeriods: number[], rowHeight: number, breakHeight: number): number {
   let y = 0;
   for (let p = 0; p < period; p++) {
-    y += ROW_HEIGHT;
+    y += rowHeight;
     if (breakAfterPeriods.includes(p)) {
-      y += BREAK_HEIGHT;
+      y += breakHeight;
     }
   }
   return y;
 }
 
-function getCardHeight(periodStart: number, periodEnd: number, breakAfterPeriods: number[]): number {
-  return getYPosition(periodEnd, breakAfterPeriods) + ROW_HEIGHT - getYPosition(periodStart, breakAfterPeriods);
+function getCardHeight(periodStart: number, periodEnd: number, breakAfterPeriods: number[], rowHeight: number, breakHeight: number): number {
+  return getYPosition(periodEnd, breakAfterPeriods, rowHeight, breakHeight) + rowHeight - getYPosition(periodStart, breakAfterPeriods, rowHeight, breakHeight);
 }
 
-function getTotalGridHeight(maxPeriods: number, breakAfterPeriods: number[]): number {
-  return getYPosition(maxPeriods - 1, breakAfterPeriods) + ROW_HEIGHT;
+function getTotalGridHeight(maxPeriods: number, breakAfterPeriods: number[], rowHeight: number, breakHeight: number): number {
+  return getYPosition(maxPeriods - 1, breakAfterPeriods, rowHeight, breakHeight) + rowHeight;
 }
 
 function getISOWeekNumber(date: Date): number {
@@ -232,8 +232,9 @@ export default function ScheduleScreen() {
   } = useApp();
 
   const [weekOffset, setWeekOffset] = useState<number>(0);
-  const timeScrollRef = useRef<ScrollView>(null);
   const [gridAreaHeight, setGridAreaHeight] = useState<number>(0);
+  const panX = useRef(new Animated.Value(0)).current;
+  const isAnimatingRef = useRef<boolean>(false);
 
   const [showActionSheet, setShowActionSheet] = useState<boolean>(false);
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
@@ -281,7 +282,18 @@ export default function ScheduleScreen() {
   );
 
   const breakAfterPeriods = scheduleTimeSettings.breakAfterPeriods;
-  const totalGridHeight = getTotalGridHeight(scheduleTimeSettings.maxPeriods, breakAfterPeriods);
+
+  const { dynamicRowHeight, dynamicBreakHeight } = useMemo(() => {
+    if (gridAreaHeight <= 0) return { dynamicRowHeight: DEFAULT_ROW_HEIGHT, dynamicBreakHeight: DEFAULT_BREAK_HEIGHT };
+    const available = gridAreaHeight - HEADER_HEIGHT;
+    const numBreaks = breakAfterPeriods.filter((p) => p < scheduleTimeSettings.maxPeriods).length;
+    const breakRatio = 0.12;
+    const rowH = available / (scheduleTimeSettings.maxPeriods + breakRatio * numBreaks);
+    const breakH = rowH * breakRatio;
+    return { dynamicRowHeight: Math.max(28, rowH), dynamicBreakHeight: Math.max(2, breakH) };
+  }, [gridAreaHeight, breakAfterPeriods, scheduleTimeSettings.maxPeriods]);
+
+  const totalGridHeight = getTotalGridHeight(scheduleTimeSettings.maxPeriods, breakAfterPeriods, dynamicRowHeight, dynamicBreakHeight);
 
   const weekData = useMemo(() => {
     const base = new Date(today);
@@ -310,6 +322,89 @@ export default function ScheduleScreen() {
       date.getFullYear() === today.getFullYear(),
     [today]
   );
+
+  const animateWeekChange = useCallback((direction: 1 | -1) => {
+    if (isAnimatingRef.current) return;
+    isAnimatingRef.current = true;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const slideOut = direction === 1 ? -SCREEN_WIDTH : SCREEN_WIDTH;
+    Animated.timing(panX, {
+      toValue: slideOut,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      setWeekOffset((prev) => prev + direction);
+      panX.setValue(-slideOut);
+      Animated.timing(panX, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start(() => {
+        isAnimatingRef.current = false;
+      });
+    });
+  }, [panX]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gs) =>
+        !isAnimatingRef.current && Math.abs(gs.dx) > Math.abs(gs.dy) && Math.abs(gs.dx) > 10,
+      onPanResponderMove: (_, gs) => {
+        if (!isAnimatingRef.current) {
+          panX.setValue(gs.dx);
+        }
+      },
+      onPanResponderRelease: (_, gs) => {
+        if (isAnimatingRef.current) return;
+        const threshold = SCREEN_WIDTH * 0.2;
+        if (gs.dx > threshold || (gs.dx > 0 && gs.vx > 0.5)) {
+          isAnimatingRef.current = true;
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          Animated.timing(panX, {
+            toValue: SCREEN_WIDTH,
+            duration: 200,
+            useNativeDriver: true,
+          }).start(() => {
+            setWeekOffset((prev) => prev - 1);
+            panX.setValue(-SCREEN_WIDTH);
+            Animated.timing(panX, {
+              toValue: 0,
+              duration: 200,
+              useNativeDriver: true,
+            }).start(() => {
+              isAnimatingRef.current = false;
+            });
+          });
+        } else if (gs.dx < -threshold || (gs.dx < 0 && gs.vx < -0.5)) {
+          isAnimatingRef.current = true;
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          Animated.timing(panX, {
+            toValue: -SCREEN_WIDTH,
+            duration: 200,
+            useNativeDriver: true,
+          }).start(() => {
+            setWeekOffset((prev) => prev + 1);
+            panX.setValue(SCREEN_WIDTH);
+            Animated.timing(panX, {
+              toValue: 0,
+              duration: 200,
+              useNativeDriver: true,
+            }).start(() => {
+              isAnimatingRef.current = false;
+            });
+          });
+        } else {
+          Animated.spring(panX, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 100,
+            friction: 10,
+          }).start();
+        }
+      },
+    })
+  ).current;
 
   const subsForWeek = useMemo(() => {
     const map: Record<number, SubstitutionEntry[]> = {};
@@ -364,27 +459,35 @@ export default function ScheduleScreen() {
   }, [scheduleEntries, eventsForWeek, subsForWeek]);
 
   const handlePrevWeek = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setWeekOffset((prev) => prev - 1);
-  }, []);
+    animateWeekChange(-1);
+  }, [animateWeekChange]);
 
   const handleNextWeek = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setWeekOffset((prev) => prev + 1);
-  }, []);
+    animateWeekChange(1);
+  }, [animateWeekChange]);
 
   const handleTodayPress = useCallback(() => {
+    if (isAnimatingRef.current) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setWeekOffset(0);
-  }, []);
-
-  const handleGridScroll = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const y = e.nativeEvent.contentOffset.y;
-      timeScrollRef.current?.scrollTo({ y, animated: false });
-    },
-    []
-  );
+    if (weekOffset === 0) return;
+    isAnimatingRef.current = true;
+    const slideDir = weekOffset > 0 ? -SCREEN_WIDTH : SCREEN_WIDTH;
+    Animated.timing(panX, {
+      toValue: slideDir,
+      duration: 180,
+      useNativeDriver: true,
+    }).start(() => {
+      setWeekOffset(0);
+      panX.setValue(-slideDir);
+      Animated.timing(panX, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: true,
+      }).start(() => {
+        isAnimatingRef.current = false;
+      });
+    });
+  }, [weekOffset, panX]);
 
   const handleDeleteEntry = useCallback(
     (id: string) => {
@@ -727,7 +830,7 @@ export default function ScheduleScreen() {
     return (
       <View style={{ height: totalGridHeight }}>
         {timeSlots.map((slot) => {
-          const top = getYPosition(slot.period, breakAfterPeriods);
+          const top = getYPosition(slot.period, breakAfterPeriods, dynamicRowHeight, dynamicBreakHeight);
           return (
             <View
               key={slot.period}
@@ -736,7 +839,7 @@ export default function ScheduleScreen() {
                 {
                   position: 'absolute' as const,
                   top,
-                  height: ROW_HEIGHT,
+                  height: dynamicRowHeight,
                   width: TIME_COL_WIDTH,
                 },
               ]}
@@ -748,7 +851,7 @@ export default function ScheduleScreen() {
         })}
         {breakAfterPeriods.map((period) => {
           if (period >= scheduleTimeSettings.maxPeriods) return null;
-          const top = getYPosition(period, breakAfterPeriods) + ROW_HEIGHT;
+          const top = getYPosition(period, breakAfterPeriods, dynamicRowHeight, dynamicBreakHeight) + dynamicRowHeight;
           return (
             <View
               key={`break-${period}`}
@@ -757,7 +860,7 @@ export default function ScheduleScreen() {
                 {
                   position: 'absolute' as const,
                   top,
-                  height: BREAK_HEIGHT,
+                  height: dynamicBreakHeight,
                   width: TIME_COL_WIDTH,
                 },
               ]}
@@ -766,7 +869,7 @@ export default function ScheduleScreen() {
         })}
       </View>
     );
-  }, [totalGridHeight, timeSlots, breakAfterPeriods, scheduleTimeSettings.maxPeriods]);
+  }, [totalGridHeight, timeSlots, breakAfterPeriods, scheduleTimeSettings.maxPeriods, dynamicRowHeight, dynamicBreakHeight]);
 
   const renderDayColumn = useCallback(
     (dayIndex: number) => {
@@ -784,7 +887,7 @@ export default function ScheduleScreen() {
           ]}
         >
           {timeSlots.map((slot) => {
-            const top = getYPosition(slot.period, breakAfterPeriods);
+            const top = getYPosition(slot.period, breakAfterPeriods, dynamicRowHeight, dynamicBreakHeight);
             return (
               <View
                 key={slot.period}
@@ -793,7 +896,7 @@ export default function ScheduleScreen() {
                   {
                     position: 'absolute' as const,
                     top,
-                    height: ROW_HEIGHT,
+                    height: dynamicRowHeight,
                     width: DAY_COL_WIDTH,
                   },
                 ]}
@@ -802,14 +905,14 @@ export default function ScheduleScreen() {
           })}
           {breakAfterPeriods.map((period) => {
             if (period >= scheduleTimeSettings.maxPeriods) return null;
-            const top = getYPosition(period, breakAfterPeriods) + ROW_HEIGHT;
+            const top = getYPosition(period, breakAfterPeriods, dynamicRowHeight, dynamicBreakHeight) + dynamicRowHeight;
             return (
               <View
                 key={`break-${period}`}
                 style={{
                   position: 'absolute' as const,
                   top,
-                  height: BREAK_HEIGHT,
+                  height: dynamicBreakHeight,
                   width: DAY_COL_WIDTH,
                   backgroundColor: isTodayCol ? 'rgba(22,23,26,0.02)' : 'transparent',
                 }}
@@ -817,8 +920,8 @@ export default function ScheduleScreen() {
             );
           })}
           {entries.map((entry) => {
-            const top = getYPosition(entry.periodStart, breakAfterPeriods);
-            const height = getCardHeight(entry.periodStart, entry.periodEnd, breakAfterPeriods);
+            const top = getYPosition(entry.periodStart, breakAfterPeriods, dynamicRowHeight, dynamicBreakHeight);
+            const height = getCardHeight(entry.periodStart, entry.periodEnd, breakAfterPeriods, dynamicRowHeight, dynamicBreakHeight);
             return (
               <LessonCard
                 key={entry.id}
@@ -847,8 +950,8 @@ export default function ScheduleScreen() {
             if (sortedPeriods.length === 0) return null;
             const pStart = sortedPeriods[0];
             const pEnd = sortedPeriods[sortedPeriods.length - 1];
-            const top = getYPosition(pStart, breakAfterPeriods);
-            const height = getCardHeight(pStart, pEnd, breakAfterPeriods);
+            const top = getYPosition(pStart, breakAfterPeriods, dynamicRowHeight, dynamicBreakHeight);
+            const height = getCardHeight(pStart, pEnd, breakAfterPeriods, dynamicRowHeight, dynamicBreakHeight);
             return (
               <EventCard
                 key={evt.id}
@@ -864,8 +967,8 @@ export default function ScheduleScreen() {
             if (sortedPeriods.length === 0) return null;
             const pStart = sortedPeriods[0];
             const pEnd = sortedPeriods[sortedPeriods.length - 1];
-            const top = getYPosition(pStart, breakAfterPeriods);
-            const height = getCardHeight(pStart, pEnd, breakAfterPeriods);
+            const top = getYPosition(pStart, breakAfterPeriods, dynamicRowHeight, dynamicBreakHeight);
+            const height = getCardHeight(pStart, pEnd, breakAfterPeriods, dynamicRowHeight, dynamicBreakHeight);
             return (
               <SubstitutionCard
                 key={sub.id}
@@ -879,7 +982,7 @@ export default function ScheduleScreen() {
         </View>
       );
     },
-    [entriesByDay, eventsForWeek, subsForWeek, isToday, weekData.dates, totalGridHeight, timeSlots, breakAfterPeriods, scheduleTimeSettings.maxPeriods, handleDeleteEntry, handleDeleteEvent, handleDeleteSub]
+    [entriesByDay, eventsForWeek, subsForWeek, isToday, weekData.dates, totalGridHeight, timeSlots, breakAfterPeriods, scheduleTimeSettings.maxPeriods, dynamicRowHeight, dynamicBreakHeight, handleDeleteEntry, handleDeleteEvent, handleDeleteSub]
   );
 
   return (
@@ -921,21 +1024,17 @@ export default function ScheduleScreen() {
       <View
         style={styles.gridWrapper}
         onLayout={(e) => setGridAreaHeight(e.nativeEvent.layout.height)}
+        {...panResponder.panHandlers}
       >
         <View style={styles.gridRow}>
           <View style={styles.timeColumnOuter}>
             <View style={[styles.cornerCell, { height: HEADER_HEIGHT }]} />
-            <ScrollView
-              ref={timeScrollRef}
-              scrollEnabled={false}
-              showsVerticalScrollIndicator={false}
-              style={gridAreaHeight > 0 ? { height: gridAreaHeight - HEADER_HEIGHT } : undefined}
-            >
+            <View style={{ flex: 1, overflow: 'hidden' as const }}>
               {renderTimeColumn}
-            </ScrollView>
+            </View>
           </View>
 
-          <View style={{ flex: 1, width: TOTAL_GRID_WIDTH }}>
+          <Animated.View style={{ flex: 1, width: TOTAL_GRID_WIDTH, transform: [{ translateX: panX }] }}>
             <View style={[styles.dayHeaderRow, { height: HEADER_HEIGHT }]}>
               {weekData.dates.map((date, idx) => {
                 const isTodayCol = isToday(date);
@@ -959,18 +1058,12 @@ export default function ScheduleScreen() {
               })}
             </View>
 
-            <ScrollView
-              onScroll={handleGridScroll}
-              scrollEventThrottle={16}
-              showsVerticalScrollIndicator={false}
-              nestedScrollEnabled
-              style={gridAreaHeight > 0 ? { height: gridAreaHeight - HEADER_HEIGHT } : undefined}
-            >
+            <View style={{ flex: 1, overflow: 'hidden' as const }}>
               <View style={[styles.gridBody, { height: totalGridHeight }]}>
                 {[0, 1, 2, 3, 4].map((dayIndex) => renderDayColumn(dayIndex))}
               </View>
-            </ScrollView>
-          </View>
+            </View>
+          </Animated.View>
         </View>
       </View>
 
