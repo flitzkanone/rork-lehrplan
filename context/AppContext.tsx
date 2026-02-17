@@ -14,6 +14,7 @@ import type {
   ScheduleTimeSettings,
   ScheduleEntry,
   OneTimeEvent,
+  SubstitutionEntry,
 } from '@/types';
 import { DEFAULT_TIME_SETTINGS, PLACEHOLDER_ENTRIES } from '@/mocks/schedule';
 import { encrypt, decrypt, hashPin, verifyPin } from '@/utils/encryption';
@@ -32,6 +33,7 @@ const PRIVACY_ACCEPTED_KEY = 'teacher_app_privacy_accepted';
 const SCHEDULE_ENTRIES_KEY = 'teacher_app_schedule_entries';
 const SCHEDULE_SETTINGS_KEY = 'teacher_app_schedule_settings';
 const ONE_TIME_EVENTS_KEY = 'teacher_app_one_time_events';
+const SUBSTITUTIONS_KEY = 'teacher_app_substitutions';
 
 const defaultData: AppData = {
   profile: { name: '', school: '', subjects: [] },
@@ -489,19 +491,22 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const [scheduleEntries, setScheduleEntries] = useState<ScheduleEntry[]>(PLACEHOLDER_ENTRIES);
   const [scheduleTimeSettings, setScheduleTimeSettings] = useState<ScheduleTimeSettings>(DEFAULT_TIME_SETTINGS);
   const [oneTimeEvents, setOneTimeEvents] = useState<OneTimeEvent[]>([]);
+  const [substitutions, setSubstitutions] = useState<SubstitutionEntry[]>([]);
 
   const scheduleQuery = useQuery({
     queryKey: ['scheduleData'],
     queryFn: async () => {
-      const [entriesRaw, settingsRaw, eventsRaw] = await Promise.all([
+      const [entriesRaw, settingsRaw, eventsRaw, subsRaw] = await Promise.all([
         AsyncStorage.getItem(SCHEDULE_ENTRIES_KEY),
         AsyncStorage.getItem(SCHEDULE_SETTINGS_KEY),
         AsyncStorage.getItem(ONE_TIME_EVENTS_KEY),
+        AsyncStorage.getItem(SUBSTITUTIONS_KEY),
       ]);
       return {
         entries: entriesRaw ? (JSON.parse(entriesRaw) as ScheduleEntry[]) : PLACEHOLDER_ENTRIES,
         settings: settingsRaw ? (JSON.parse(settingsRaw) as ScheduleTimeSettings) : DEFAULT_TIME_SETTINGS,
         events: eventsRaw ? (JSON.parse(eventsRaw) as OneTimeEvent[]) : [],
+        substitutions: subsRaw ? (JSON.parse(subsRaw) as SubstitutionEntry[]) : [],
       };
     },
   });
@@ -511,6 +516,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
       setScheduleEntries(scheduleQuery.data.entries);
       setScheduleTimeSettings(scheduleQuery.data.settings);
       setOneTimeEvents(scheduleQuery.data.events);
+      setSubstitutions(scheduleQuery.data.substitutions);
     }
   }, [scheduleQuery.data]);
 
@@ -518,10 +524,11 @@ export const [AppProvider, useApp] = createContextHook(() => {
     async (entries: ScheduleEntry[]) => {
       setScheduleEntries(entries);
       await AsyncStorage.setItem(SCHEDULE_ENTRIES_KEY, JSON.stringify(entries));
-      queryClient.setQueryData(['scheduleData'], (old: { entries: ScheduleEntry[]; settings: ScheduleTimeSettings; events: OneTimeEvent[] } | undefined) => ({
+      queryClient.setQueryData(['scheduleData'], (old: { entries: ScheduleEntry[]; settings: ScheduleTimeSettings; events: OneTimeEvent[]; substitutions: SubstitutionEntry[] } | undefined) => ({
         entries,
         settings: old?.settings ?? DEFAULT_TIME_SETTINGS,
         events: old?.events ?? [],
+        substitutions: old?.substitutions ?? [],
       }));
     },
     [queryClient]
@@ -531,10 +538,11 @@ export const [AppProvider, useApp] = createContextHook(() => {
     async (settings: ScheduleTimeSettings) => {
       setScheduleTimeSettings(settings);
       await AsyncStorage.setItem(SCHEDULE_SETTINGS_KEY, JSON.stringify(settings));
-      queryClient.setQueryData(['scheduleData'], (old: { entries: ScheduleEntry[]; settings: ScheduleTimeSettings; events: OneTimeEvent[] } | undefined) => ({
+      queryClient.setQueryData(['scheduleData'], (old: { entries: ScheduleEntry[]; settings: ScheduleTimeSettings; events: OneTimeEvent[]; substitutions: SubstitutionEntry[] } | undefined) => ({
         entries: old?.entries ?? PLACEHOLDER_ENTRIES,
         settings,
         events: old?.events ?? [],
+        substitutions: old?.substitutions ?? [],
       }));
     },
     [queryClient]
@@ -544,13 +552,46 @@ export const [AppProvider, useApp] = createContextHook(() => {
     async (events: OneTimeEvent[]) => {
       setOneTimeEvents(events);
       await AsyncStorage.setItem(ONE_TIME_EVENTS_KEY, JSON.stringify(events));
-      queryClient.setQueryData(['scheduleData'], (old: { entries: ScheduleEntry[]; settings: ScheduleTimeSettings; events: OneTimeEvent[] } | undefined) => ({
+      queryClient.setQueryData(['scheduleData'], (old: { entries: ScheduleEntry[]; settings: ScheduleTimeSettings; events: OneTimeEvent[]; substitutions: SubstitutionEntry[] } | undefined) => ({
         entries: old?.entries ?? PLACEHOLDER_ENTRIES,
         settings: old?.settings ?? DEFAULT_TIME_SETTINGS,
         events,
+        substitutions: old?.substitutions ?? [],
       }));
     },
     [queryClient]
+  );
+
+  const saveSubstitutions = useCallback(
+    async (subs: SubstitutionEntry[]) => {
+      setSubstitutions(subs);
+      await AsyncStorage.setItem(SUBSTITUTIONS_KEY, JSON.stringify(subs));
+      queryClient.setQueryData(['scheduleData'], (old: { entries: ScheduleEntry[]; settings: ScheduleTimeSettings; events: OneTimeEvent[]; substitutions: SubstitutionEntry[] } | undefined) => ({
+        entries: old?.entries ?? PLACEHOLDER_ENTRIES,
+        settings: old?.settings ?? DEFAULT_TIME_SETTINGS,
+        events: old?.events ?? [],
+        substitutions: subs,
+      }));
+    },
+    [queryClient]
+  );
+
+  const addSubstitution = useCallback(
+    (entry: Omit<SubstitutionEntry, 'id'>) => {
+      const newEntry: SubstitutionEntry = { ...entry, id: generateId() };
+      const updated = [...substitutions, newEntry];
+      saveSubstitutions(updated);
+      return newEntry;
+    },
+    [substitutions, saveSubstitutions]
+  );
+
+  const deleteSubstitution = useCallback(
+    (subId: string) => {
+      const updated = substitutions.filter((s) => s.id !== subId);
+      saveSubstitutions(updated);
+    },
+    [substitutions, saveSubstitutions]
   );
 
   const addOneTimeEvent = useCallback(
@@ -638,5 +679,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
     oneTimeEvents,
     addOneTimeEvent,
     deleteOneTimeEvent,
+    substitutions,
+    addSubstitution,
+    deleteSubstitution,
   };
 });

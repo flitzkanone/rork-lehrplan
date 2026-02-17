@@ -303,3 +303,14 @@ export interface OneTimeEvent {
   color: string;
   notes: string;
 }
+
+export interface SubstitutionEntry {
+  id: string;
+  date: string;
+  periods: number[];
+  subject?: string;
+  className?: string;
+  room: string;
+  color: string;
+  hiddenRegularEntries: string[];
+}

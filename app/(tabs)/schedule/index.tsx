@@ -16,7 +16,7 @@ import {
   Switch,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronLeft, ChevronRight, Plus, Settings2, X, Trash2, Check, Clock, Calendar, CalendarDays, BookOpen, StickyNote } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Plus, Settings2, X, Trash2, Check, Clock, Calendar, CalendarDays, BookOpen, StickyNote, RefreshCw } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useApp } from '@/context/AppContext';
@@ -26,7 +26,7 @@ import {
   generateTimeSlots,
 } from '@/mocks/schedule';
 import type { ScheduleTimeSlot } from '@/mocks/schedule';
-import type { ScheduleEntry, ScheduleTimeSettings, OneTimeEvent } from '@/types';
+import type { ScheduleEntry, ScheduleTimeSettings, OneTimeEvent, SubstitutionEntry } from '@/types';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const TIME_COL_WIDTH = 38;
@@ -122,6 +122,56 @@ const LessonCard = React.memo(({
   );
 });
 
+const SubstitutionCard = React.memo(({
+  sub,
+  top,
+  height,
+  onLongPress,
+}: {
+  sub: SubstitutionEntry;
+  top: number;
+  height: number;
+  onLongPress: () => void;
+}) => {
+  const hasSubject = !!sub.subject;
+  const hasClass = !!sub.className;
+  return (
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onLongPress={onLongPress}
+      delayLongPress={400}
+      style={[
+        styles.substitutionCard,
+        {
+          position: 'absolute' as const,
+          top: top + 1,
+          height: height - 2,
+          left: 1,
+          width: DAY_COL_WIDTH - 2,
+          backgroundColor: sub.color + '18',
+        },
+      ]}
+    >
+      <View style={[styles.accentBar, { backgroundColor: sub.color }]} />
+      <View style={styles.cardContent}>
+        {hasClass ? (
+          <Text style={styles.cardClass} numberOfLines={1}>{sub.className}</Text>
+        ) : null}
+        {hasSubject ? (
+          <Text style={styles.cardSubject} numberOfLines={1}>{sub.subject}</Text>
+        ) : (
+          <Text style={[styles.cardClass, { fontSize: height > 60 ? 9 : 8 }]} numberOfLines={2}>
+            {hasClass ? 'VERTRETUNG' : 'BETREUUNG'}
+          </Text>
+        )}
+        {height > 40 && sub.room ? (
+          <Text style={styles.cardRoom} numberOfLines={1}>{sub.room}</Text>
+        ) : null}
+      </View>
+    </TouchableOpacity>
+  );
+});
+
 const EventCard = React.memo(({
   event,
   top,
@@ -175,6 +225,9 @@ export default function ScheduleScreen() {
     oneTimeEvents,
     addOneTimeEvent,
     deleteOneTimeEvent,
+    substitutions,
+    addSubstitution,
+    deleteSubstitution,
     data,
   } = useApp();
 
@@ -186,8 +239,9 @@ export default function ScheduleScreen() {
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [showEventModal, setShowEventModal] = useState<boolean>(false);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
+  const [showSubModal, setShowSubModal] = useState<boolean>(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
-  const [deleteType, setDeleteType] = useState<'entry' | 'event'>('entry');
+  const [deleteType, setDeleteType] = useState<'entry' | 'event' | 'substitution'>('entry');
 
   const [newSubject, setNewSubject] = useState<string>('');
   const [newClassName, setNewClassName] = useState<string>('');
@@ -205,6 +259,13 @@ export default function ScheduleScreen() {
   const [eventRoom, setEventRoom] = useState<string>('');
   const [eventColor, setEventColor] = useState<string>(EVENT_COLORS[0]);
   const [eventNotes, setEventNotes] = useState<string>('');
+
+  const [subSubject, setSubSubject] = useState<string>('');
+  const [subClassName, setSubClassName] = useState<string>('');
+  const [subRoom, setSubRoom] = useState<string>('');
+  const [subDate, setSubDate] = useState<string>('');
+  const [subPeriods, setSubPeriods] = useState<number[]>([]);
+  const [subColor, setSubColor] = useState<string>('#94A3B8');
 
   const [tempStartTime, setTempStartTime] = useState<string>(scheduleTimeSettings.lessonStartTime);
   const [tempDuration, setTempDuration] = useState<string>(String(scheduleTimeSettings.lessonDuration));
@@ -250,6 +311,15 @@ export default function ScheduleScreen() {
     [today]
   );
 
+  const subsForWeek = useMemo(() => {
+    const map: Record<number, SubstitutionEntry[]> = {};
+    for (let i = 0; i < 5; i++) {
+      const dateStr = formatDateStr(weekData.dates[i]);
+      map[i] = substitutions.filter((s) => s.date === dateStr);
+    }
+    return map;
+  }, [substitutions, weekData.dates]);
+
   const eventsForWeek = useMemo(() => {
     const map: Record<number, OneTimeEvent[]> = {};
     for (let i = 0; i < 5; i++) {
@@ -263,6 +333,7 @@ export default function ScheduleScreen() {
     const map: Record<number, ScheduleEntry[]> = {};
     for (let i = 0; i < 5; i++) {
       const dayEvents = eventsForWeek[i] || [];
+      const daySubs = subsForWeek[i] || [];
       const allDayEvent = dayEvents.find((e) => e.isAllDay);
 
       if (allDayEvent) {
@@ -273,8 +344,14 @@ export default function ScheduleScreen() {
           evt.periods.forEach((p) => blockedPeriods.add(p));
         });
 
+        const hiddenIds = new Set<string>();
+        daySubs.forEach((sub) => {
+          sub.hiddenRegularEntries.forEach((id) => hiddenIds.add(id));
+        });
+
         map[i] = scheduleEntries
           .filter((e) => e.dayIndex === i)
+          .filter((e) => !hiddenIds.has(e.id))
           .filter((e) => {
             for (let p = e.periodStart; p <= e.periodEnd; p++) {
               if (blockedPeriods.has(p)) return false;
@@ -284,7 +361,7 @@ export default function ScheduleScreen() {
       }
     }
     return map;
-  }, [scheduleEntries, eventsForWeek]);
+  }, [scheduleEntries, eventsForWeek, subsForWeek]);
 
   const handlePrevWeek = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -327,16 +404,27 @@ export default function ScheduleScreen() {
     []
   );
 
+  const handleDeleteSub = useCallback(
+    (id: string) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setDeleteType('substitution');
+      setShowDeleteConfirm(id);
+    },
+    []
+  );
+
   const confirmDelete = useCallback(() => {
     if (showDeleteConfirm) {
       if (deleteType === 'entry') {
         deleteScheduleEntry(showDeleteConfirm);
-      } else {
+      } else if (deleteType === 'event') {
         deleteOneTimeEvent(showDeleteConfirm);
+      } else {
+        deleteSubstitution(showDeleteConfirm);
       }
       setShowDeleteConfirm(null);
     }
-  }, [showDeleteConfirm, deleteType, deleteScheduleEntry, deleteOneTimeEvent]);
+  }, [showDeleteConfirm, deleteType, deleteScheduleEntry, deleteOneTimeEvent, deleteSubstitution]);
 
   const resetAddForm = useCallback(() => {
     setNewSubject('');
@@ -345,6 +433,15 @@ export default function ScheduleScreen() {
     setNewColor(SCHEDULE_COLORS[0]);
     setNewDayIndex(0);
     setNewPeriods([]);
+  }, []);
+
+  const resetSubForm = useCallback(() => {
+    setSubSubject('');
+    setSubClassName('');
+    setSubRoom('');
+    setSubDate('');
+    setSubPeriods([]);
+    setSubColor('#94A3B8');
   }, []);
 
   const resetEventForm = useCallback(() => {
@@ -378,6 +475,13 @@ export default function ScheduleScreen() {
     setShowEventModal(true);
   }, [resetEventForm, today]);
 
+  const handleChooseSubstitution = useCallback(() => {
+    setShowActionSheet(false);
+    resetSubForm();
+    setSubDate(formatDateStr(today));
+    setShowSubModal(true);
+  }, [resetSubForm, today]);
+
   const handleTogglePeriod = useCallback((period: number) => {
     Haptics.selectionAsync();
     setNewPeriods((prev) => {
@@ -391,6 +495,16 @@ export default function ScheduleScreen() {
   const handleToggleEventPeriod = useCallback((period: number) => {
     Haptics.selectionAsync();
     setEventPeriods((prev) => {
+      if (prev.includes(period)) {
+        return prev.filter((p) => p !== period);
+      }
+      return [...prev, period].sort((a, b) => a - b);
+    });
+  }, []);
+
+  const handleToggleSubPeriod = useCallback((period: number) => {
+    Haptics.selectionAsync();
+    setSubPeriods((prev) => {
       if (prev.includes(period)) {
         return prev.filter((p) => p !== period);
       }
@@ -440,6 +554,68 @@ export default function ScheduleScreen() {
     setShowAddModal(false);
     resetAddForm();
   }, [newSubject, newClassName, newRoom, newColor, newDayIndex, newPeriods, addScheduleEntry, resetAddForm]);
+
+  const handleAddSubstitution = useCallback(() => {
+    if (!subRoom.trim()) {
+      Alert.alert('Fehler', 'Bitte geben Sie einen Raum ein.');
+      return;
+    }
+    if (!subDate) {
+      Alert.alert('Fehler', 'Bitte wählen Sie ein Datum.');
+      return;
+    }
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(subDate)) {
+      Alert.alert('Fehler', 'Bitte geben Sie ein gültiges Datum ein (JJJJ-MM-TT).');
+      return;
+    }
+    if (subPeriods.length === 0) {
+      Alert.alert('Fehler', 'Bitte wählen Sie mindestens eine Stunde.');
+      return;
+    }
+
+    const subDateObj = new Date(subDate + 'T00:00:00');
+    const dayOfWeek = (subDateObj.getDay() + 6) % 7;
+    const subPeriodsSet = new Set(subPeriods);
+
+    const conflicting = scheduleEntries.filter((e) => {
+      if (e.dayIndex !== dayOfWeek) return false;
+      for (let p = e.periodStart; p <= e.periodEnd; p++) {
+        if (subPeriodsSet.has(p)) return true;
+      }
+      return false;
+    });
+
+    const doSave = (hiddenIds: string[]) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      addSubstitution({
+        date: subDate,
+        periods: subPeriods,
+        subject: subSubject.trim() || undefined,
+        className: subClassName.trim() || undefined,
+        room: subRoom.trim(),
+        color: subColor,
+        hiddenRegularEntries: hiddenIds,
+      });
+      setShowSubModal(false);
+      resetSubForm();
+    };
+
+    if (conflicting.length > 0) {
+      const names = conflicting.map((c) => `${c.className} (${c.subject})`).join(', ');
+      Alert.alert(
+        'Überschneidung',
+        `Diese Vertretung überschneidet sich mit: ${names}. Sollen die regulären Stunden für diesen Tag ausgeblendet werden?`,
+        [
+          { text: 'Abbrechen', style: 'cancel' },
+          { text: 'Nein, beibehalten', onPress: () => doSave([]) },
+          { text: 'Ja, ausblenden', style: 'destructive', onPress: () => doSave(conflicting.map((c) => c.id)) },
+        ]
+      );
+    } else {
+      doSave([]);
+    }
+  }, [subRoom, subDate, subPeriods, subSubject, subClassName, subColor, scheduleEntries, addSubstitution, resetSubForm]);
 
   const handleAddEvent = useCallback(() => {
     if (!eventTitle.trim()) {
@@ -683,10 +859,27 @@ export default function ScheduleScreen() {
               />
             );
           })}
+          {(subsForWeek[dayIndex] || []).map((sub) => {
+            const sortedPeriods = [...sub.periods].sort((a, b) => a - b);
+            if (sortedPeriods.length === 0) return null;
+            const pStart = sortedPeriods[0];
+            const pEnd = sortedPeriods[sortedPeriods.length - 1];
+            const top = getYPosition(pStart, breakAfterPeriods);
+            const height = getCardHeight(pStart, pEnd, breakAfterPeriods);
+            return (
+              <SubstitutionCard
+                key={sub.id}
+                sub={sub}
+                top={top}
+                height={height}
+                onLongPress={() => handleDeleteSub(sub.id)}
+              />
+            );
+          })}
         </View>
       );
     },
-    [entriesByDay, eventsForWeek, isToday, weekData.dates, totalGridHeight, timeSlots, breakAfterPeriods, scheduleTimeSettings.maxPeriods, handleDeleteEntry, handleDeleteEvent]
+    [entriesByDay, eventsForWeek, subsForWeek, isToday, weekData.dates, totalGridHeight, timeSlots, breakAfterPeriods, scheduleTimeSettings.maxPeriods, handleDeleteEntry, handleDeleteEvent, handleDeleteSub]
   );
 
   return (
@@ -817,6 +1010,20 @@ export default function ScheduleScreen() {
               <View style={styles.actionSheetOptionText}>
                 <Text style={styles.actionSheetOptionTitle}>Einmaliges Ereignis</Text>
                 <Text style={styles.actionSheetOptionDesc}>Ausflug, Konferenz, Fortbildung etc.</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionSheetOption}
+              activeOpacity={0.6}
+              onPress={handleChooseSubstitution}
+            >
+              <View style={[styles.actionSheetIcon, { backgroundColor: '#E2E8F0' }]}>
+                <RefreshCw size={20} color="#475569" strokeWidth={1.8} />
+              </View>
+              <View style={styles.actionSheetOptionText}>
+                <Text style={styles.actionSheetOptionTitle}>Vertretung</Text>
+                <Text style={styles.actionSheetOptionDesc}>Vertretungs- oder Betreuungsstunde</Text>
               </View>
             </TouchableOpacity>
 
@@ -1098,6 +1305,119 @@ export default function ScheduleScreen() {
             </ScrollView>
 
             <TouchableOpacity style={styles.saveBtn} onPress={handleAddEvent} activeOpacity={0.7}>
+              <Text style={styles.saveBtnText}>Hinzufügen</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Add Substitution Modal */}
+      <Modal visible={showSubModal} transparent animationType="slide">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={[styles.modalContent, styles.addModalContent]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Vertretung</Text>
+              <TouchableOpacity onPress={() => setShowSubModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <X size={20} color={Colors.textSecondary} strokeWidth={1.7} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.addFormScroll}>
+              <Text style={styles.fieldLabel}>Fach (Optional)</Text>
+              {subjectOptions.length > 0 ? (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+                  <TouchableOpacity
+                    style={[styles.chip, !subSubject && styles.chipActive]}
+                    onPress={() => { Haptics.selectionAsync(); setSubSubject(''); }}
+                  >
+                    <Text style={[styles.chipText, !subSubject && styles.chipTextActive]}>Keine</Text>
+                  </TouchableOpacity>
+                  {subjectOptions.map((s) => (
+                    <TouchableOpacity
+                      key={s}
+                      style={[styles.chip, subSubject === s && styles.chipActive]}
+                      onPress={() => { Haptics.selectionAsync(); setSubSubject(s); }}
+                    >
+                      <Text style={[styles.chipText, subSubject === s && styles.chipTextActive]}>{s}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              ) : (
+                <TextInput
+                  style={styles.input}
+                  value={subSubject}
+                  onChangeText={setSubSubject}
+                  placeholder="Leer lassen für Betreuung"
+                  placeholderTextColor={Colors.textLight}
+                />
+              )}
+
+              <Text style={styles.fieldLabel}>Klasse (Optional)</Text>
+              <TextInput
+                style={styles.input}
+                value={subClassName}
+                onChangeText={setSubClassName}
+                placeholder="z.B. 9a"
+                placeholderTextColor={Colors.textLight}
+              />
+
+              <Text style={styles.fieldLabel}>Raum *</Text>
+              <TextInput
+                style={styles.input}
+                value={subRoom}
+                onChangeText={setSubRoom}
+                placeholder="z.B. R208, Sporthalle"
+                placeholderTextColor={Colors.textLight}
+              />
+
+              <Text style={styles.fieldLabel}>Datum</Text>
+              <View style={styles.timeInputRow}>
+                <Calendar size={16} color={Colors.textSecondary} strokeWidth={1.7} />
+                <TextInput
+                  style={[styles.input, styles.timeInput]}
+                  value={subDate}
+                  onChangeText={setSubDate}
+                  placeholder="JJJJ-MM-TT"
+                  placeholderTextColor={Colors.textLight}
+                  maxLength={10}
+                />
+              </View>
+
+              <Text style={styles.fieldLabel}>Stunden</Text>
+              <View style={styles.periodGrid}>
+                {timeSlots.map((slot) => {
+                  const sel = subPeriods.includes(slot.period);
+                  return (
+                    <TouchableOpacity
+                      key={slot.period}
+                      style={[styles.periodBtn, sel && styles.periodBtnActive]}
+                      onPress={() => handleToggleSubPeriod(slot.period)}
+                    >
+                      <Text style={[styles.periodBtnNum, sel && styles.periodBtnNumActive]}>{slot.period + 1}</Text>
+                      <Text style={[styles.periodBtnTime, sel && styles.periodBtnTimeActive]}>{slot.startTime}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.fieldLabel}>Farbe</Text>
+              <View style={styles.colorRow}>
+                {['#94A3B8', '#64748B', '#475569', ...SCHEDULE_COLORS].map((c) => (
+                  <TouchableOpacity
+                    key={c}
+                    style={[styles.colorDot, { backgroundColor: c }, subColor === c && styles.colorDotActive]}
+                    onPress={() => { Haptics.selectionAsync(); setSubColor(c); }}
+                  >
+                    {subColor === c && <Check size={12} color={Colors.white} strokeWidth={3} />}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity style={styles.saveBtn} onPress={handleAddSubstitution} activeOpacity={0.7}>
               <Text style={styles.saveBtnText}>Hinzufügen</Text>
             </TouchableOpacity>
           </View>
@@ -1387,6 +1707,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1.5,
     borderStyle: 'dashed' as const,
+  },
+  substitutionCard: {
+    flexDirection: 'row',
+    borderRadius: 4,
+    overflow: 'hidden',
+    borderWidth: 2.5,
+    borderColor: '#1E293B',
   },
   eventIconRow: {
     flexDirection: 'row',
