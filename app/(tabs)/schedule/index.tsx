@@ -252,7 +252,7 @@ export default function ScheduleScreen() {
   const [newClassName, setNewClassName] = useState<string>('');
   const [newRoom, setNewRoom] = useState<string>('');
   const [newColor, setNewColor] = useState<string>(SCHEDULE_COLORS[0]);
-  const [newDayIndex, setNewDayIndex] = useState<number>(0);
+  const [newDayIndices, setNewDayIndices] = useState<number[]>([]);
   const [newPeriods, setNewPeriods] = useState<number[]>([]);
 
   const [eventTitle, setEventTitle] = useState<string>('');
@@ -540,7 +540,7 @@ export default function ScheduleScreen() {
     setNewClassName('');
     setNewRoom('');
     setNewColor(SCHEDULE_COLORS[0]);
-    setNewDayIndex(0);
+    setNewDayIndices([]);
     setNewPeriods([]);
   }, []);
 
@@ -621,6 +621,16 @@ export default function ScheduleScreen() {
     });
   }, []);
 
+  const handleToggleDayIndex = useCallback((idx: number) => {
+    Haptics.selectionAsync();
+    setNewDayIndices((prev) => {
+      if (prev.includes(idx)) {
+        return prev.filter((d) => d !== idx);
+      }
+      return [...prev, idx].sort((a, b) => a - b);
+    });
+  }, []);
+
   const handleAddEntry = useCallback(() => {
     if (!newSubject.trim()) {
       Alert.alert('Fehler', 'Bitte wählen Sie ein Fach.');
@@ -628,6 +638,10 @@ export default function ScheduleScreen() {
     }
     if (!newClassName.trim()) {
       Alert.alert('Fehler', 'Bitte geben Sie einen Klassennamen ein.');
+      return;
+    }
+    if (newDayIndices.length === 0) {
+      Alert.alert('Fehler', 'Bitte wählen Sie mindestens einen Wochentag.');
       return;
     }
     if (newPeriods.length === 0) {
@@ -650,19 +664,21 @@ export default function ScheduleScreen() {
     }
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    addScheduleEntry({
-      dayIndex: newDayIndex,
-      periodStart: sortedPeriods[0],
-      periodEnd: sortedPeriods[sortedPeriods.length - 1],
-      className: newClassName.trim(),
-      subject: newSubject.trim(),
-      room: newRoom.trim(),
-      color: newColor,
-    });
+    for (const dayIdx of newDayIndices) {
+      addScheduleEntry({
+        dayIndex: dayIdx,
+        periodStart: sortedPeriods[0],
+        periodEnd: sortedPeriods[sortedPeriods.length - 1],
+        className: newClassName.trim(),
+        subject: newSubject.trim(),
+        room: newRoom.trim(),
+        color: newColor,
+      });
+    }
 
     setShowAddModal(false);
     resetAddForm();
-  }, [newSubject, newClassName, newRoom, newColor, newDayIndex, newPeriods, addScheduleEntry, resetAddForm]);
+  }, [newSubject, newClassName, newRoom, newColor, newDayIndices, newPeriods, addScheduleEntry, resetAddForm]);
 
   const handleAddSubstitution = useCallback(() => {
     if (!subRoom.trim()) {
@@ -1230,15 +1246,15 @@ export default function ScheduleScreen() {
                 ))}
               </View>
 
-              <Text style={styles.fieldLabel}>Wochentag</Text>
+              <Text style={styles.fieldLabel}>Wochentage</Text>
               <View style={styles.dayPickerRow}>
                 {DAYS.map((d, idx) => (
                   <TouchableOpacity
                     key={d}
-                    style={[styles.dayChip, newDayIndex === idx && styles.dayChipActive]}
-                    onPress={() => { Haptics.selectionAsync(); setNewDayIndex(idx); }}
+                    style={[styles.dayChip, newDayIndices.includes(idx) && styles.dayChipActive]}
+                    onPress={() => handleToggleDayIndex(idx)}
                   >
-                    <Text style={[styles.dayChipText, newDayIndex === idx && styles.dayChipTextActive]}>{d}</Text>
+                    <Text style={[styles.dayChipText, newDayIndices.includes(idx) && styles.dayChipTextActive]}>{d}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
