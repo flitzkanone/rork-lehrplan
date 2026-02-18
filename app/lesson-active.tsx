@@ -46,6 +46,7 @@ function RatingButton({
   onPress: () => void;
 }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const [pressed, setPressed] = useState(false);
 
   const handlePress = () => {
     Animated.sequence([
@@ -53,6 +54,12 @@ function RatingButton({
       Animated.timing(scaleAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
     ]).start();
     onPress();
+  };
+
+  const pressedColors: Record<ParticipationRating, { bg: string; activeBg: string; border: string }> = {
+    '+': { bg: '#BBF7D0', activeBg: '#15803D', border: '#15803D' },
+    'o': { bg: '#E2E2E5', activeBg: '#6B6B70', border: '#6B6B70' },
+    '-': { bg: '#FECACA', activeBg: '#B91C1C', border: '#B91C1C' },
   };
 
   const config: Record<ParticipationRating, { bg: string; activeBg: string; border: string; icon: React.ReactNode; label: string }> = {
@@ -80,22 +87,31 @@ function RatingButton({
   };
 
   const c = config[type];
+  const pc = pressedColors[type];
+
+  const bgColor = pressed
+    ? (active ? pc.activeBg : pc.bg)
+    : (active ? c.activeBg : c.bg);
+  const borderColor = pressed
+    ? pc.border
+    : (active ? c.border : 'transparent');
 
   return (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-      <TouchableOpacity
+      <Pressable
         style={[
           styles.ratingBtn,
           {
-            backgroundColor: active ? c.activeBg : c.bg,
-            borderColor: active ? c.border : 'transparent',
+            backgroundColor: bgColor,
+            borderColor: borderColor,
           },
         ]}
         onPress={handlePress}
-        activeOpacity={0.55}
+        onPressIn={() => setPressed(true)}
+        onPressOut={() => setPressed(false)}
       >
         {c.icon}
-      </TouchableOpacity>
+      </Pressable>
     </Animated.View>
   );
 }
@@ -110,6 +126,7 @@ function HomeworkButton({
   onPress: () => void;
 }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const [pressed, setPressed] = useState(false);
 
   const handlePress = () => {
     Animated.sequence([
@@ -117,6 +134,12 @@ function HomeworkButton({
       Animated.timing(scaleAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
     ]).start();
     onPress();
+  };
+
+  const pressedColors: Record<HomeworkStatus, { bg: string; activeBg: string; border: string }> = {
+    'done': { bg: '#BBF7D0', activeBg: '#15803D', border: '#15803D' },
+    'missing': { bg: '#FECACA', activeBg: '#B91C1C', border: '#B91C1C' },
+    'late': { bg: '#FDE68A', activeBg: '#B45309', border: '#B45309' },
   };
 
   const config: Record<HomeworkStatus, { bg: string; activeBg: string; border: string; icon: React.ReactNode }> = {
@@ -141,22 +164,31 @@ function HomeworkButton({
   };
 
   const c = config[status];
+  const pc = pressedColors[status];
+
+  const bgColor = pressed
+    ? (active ? pc.activeBg : pc.bg)
+    : (active ? c.activeBg : c.bg);
+  const borderColor = pressed
+    ? pc.border
+    : (active ? c.border : 'transparent');
 
   return (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-      <TouchableOpacity
+      <Pressable
         style={[
           styles.homeworkBtn,
           {
-            backgroundColor: active ? c.activeBg : c.bg,
-            borderColor: active ? c.border : 'transparent',
+            backgroundColor: bgColor,
+            borderColor: borderColor,
           },
         ]}
         onPress={handlePress}
-        activeOpacity={0.55}
+        onPressIn={() => setPressed(true)}
+        onPressOut={() => setPressed(false)}
       >
         {c.icon}
-      </TouchableOpacity>
+      </Pressable>
     </Animated.View>
   );
 }
