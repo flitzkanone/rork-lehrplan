@@ -9,7 +9,7 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Search, Filter, TrendingUp, TrendingDown, Minus, Plus, Circle, Check, X, Clock, ThumbsUp, ThumbsDown } from 'lucide-react-native';
+import { Search, Filter, TrendingUp, TrendingDown, Minus, Circle, Check, X, Clock, ThumbsUp, ThumbsDown } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useApp } from '@/context/AppContext';
 import { StatisticsScreenSkeleton } from '@/components/SkeletonLoader';
@@ -21,21 +21,21 @@ function StatBadge({ count, type }: { count: number; type: '+' | 'o' | '-' }) {
       bg: Colors.positiveLight,
       color: Colors.positive,
       borderColor: 'rgba(34,164,93,0.15)',
-      icon: <Plus size={11} color={Colors.positive} strokeWidth={2.8} />,
+      icon: <Check size={12} color={Colors.positive} strokeWidth={2.8} />,
       label: 'Gut',
     },
     'o': {
       bg: Colors.neutralLight,
       color: Colors.neutral,
       borderColor: 'rgba(148,151,158,0.15)',
-      icon: <Circle size={10} color={Colors.neutral} strokeWidth={2.8} />,
+      icon: <Circle size={11} color={Colors.neutral} strokeWidth={2.8} />,
       label: 'Neutral',
     },
     '-': {
       bg: Colors.negativeLight,
       color: Colors.negative,
       borderColor: 'rgba(204,59,42,0.15)',
-      icon: <Minus size={11} color={Colors.negative} strokeWidth={2.8} />,
+      icon: <X size={12} color={Colors.negative} strokeWidth={2.8} />,
       label: 'Schlecht',
     },
   };
