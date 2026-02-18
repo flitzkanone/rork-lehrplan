@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Plus, Minus, Circle, CheckCircle, Users, ThumbsUp, HandHelping, EyeOff, Volume2, FileX, BookOpen, Check, X, Clock } from 'lucide-react-native';
+import { Plus, Minus, Circle, CheckCircle, Users, ThumbsUp, ThumbsDown, HandHelping, EyeOff, Volume2, FileX, BookOpen, Check, X, Clock } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useApp } from '@/context/AppContext';
@@ -55,10 +55,28 @@ function RatingButton({
     onPress();
   };
 
-  const config = {
-    '+': { bg: active ? Colors.positive : Colors.positiveLight, icon: <Plus size={15} color={active ? Colors.white : Colors.positive} strokeWidth={2.5} />, border: Colors.positive },
-    'o': { bg: active ? Colors.neutral : Colors.neutralLight, icon: <Circle size={13} color={active ? Colors.white : Colors.neutral} strokeWidth={2.5} />, border: Colors.neutral },
-    '-': { bg: active ? Colors.negative : Colors.negativeLight, icon: <Minus size={15} color={active ? Colors.white : Colors.negative} strokeWidth={2.5} />, border: Colors.negative },
+  const config: Record<ParticipationRating, { bg: string; activeBg: string; border: string; icon: React.ReactNode; label: string }> = {
+    '+': {
+      bg: Colors.positiveLight,
+      activeBg: Colors.positive,
+      border: Colors.positive,
+      icon: <ThumbsUp size={14} color={active ? '#FFFFFF' : Colors.positive} strokeWidth={2.2} />,
+      label: '+',
+    },
+    'o': {
+      bg: Colors.neutralLight,
+      activeBg: Colors.neutral,
+      border: Colors.neutral,
+      icon: <Circle size={12} color={active ? '#FFFFFF' : Colors.neutral} strokeWidth={2.5} />,
+      label: 'o',
+    },
+    '-': {
+      bg: Colors.negativeLight,
+      activeBg: Colors.negative,
+      border: Colors.negative,
+      icon: <ThumbsDown size={14} color={active ? '#FFFFFF' : Colors.negative} strokeWidth={2.2} />,
+      label: '-',
+    },
   };
 
   const c = config[type];
@@ -66,7 +84,13 @@ function RatingButton({
   return (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
       <TouchableOpacity
-        style={[styles.ratingBtn, { backgroundColor: c.bg, borderColor: active ? c.border : 'transparent' }]}
+        style={[
+          styles.ratingBtn,
+          {
+            backgroundColor: active ? c.activeBg : c.bg,
+            borderColor: active ? c.border : 'transparent',
+          },
+        ]}
         onPress={handlePress}
         activeOpacity={0.55}
       >

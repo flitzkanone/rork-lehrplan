@@ -9,35 +9,87 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Search, Filter, TrendingUp, TrendingDown, Minus, Check, X, Clock } from 'lucide-react-native';
+import { Search, Filter, TrendingUp, TrendingDown, Minus, Plus, Circle, Check, X, Clock, ThumbsUp, ThumbsDown } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useApp } from '@/context/AppContext';
 import { StatisticsScreenSkeleton } from '@/components/SkeletonLoader';
 import type { Student } from '@/types';
+
+function StatBadge({ count, type }: { count: number; type: '+' | 'o' | '-' }) {
+  const config = {
+    '+': {
+      bg: Colors.positiveLight,
+      color: Colors.positive,
+      borderColor: 'rgba(34,164,93,0.15)',
+      icon: <Plus size={11} color={Colors.positive} strokeWidth={2.8} />,
+      label: 'Gut',
+    },
+    'o': {
+      bg: Colors.neutralLight,
+      color: Colors.neutral,
+      borderColor: 'rgba(148,151,158,0.15)',
+      icon: <Circle size={10} color={Colors.neutral} strokeWidth={2.8} />,
+      label: 'Neutral',
+    },
+    '-': {
+      bg: Colors.negativeLight,
+      color: Colors.negative,
+      borderColor: 'rgba(204,59,42,0.15)',
+      icon: <Minus size={11} color={Colors.negative} strokeWidth={2.8} />,
+      label: 'Schlecht',
+    },
+  };
+
+  const c = config[type];
+
+  return (
+    <View style={[statBadgeStyles.badge, { backgroundColor: c.bg, borderColor: c.borderColor }]}>
+      <View style={[statBadgeStyles.iconWrap, { backgroundColor: c.borderColor }]}>
+        {c.icon}
+      </View>
+      <Text style={[statBadgeStyles.count, { color: c.color }]}>{count}</Text>
+    </View>
+  );
+}
+
+const statBadgeStyles = StyleSheet.create({
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    paddingRight: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  iconWrap: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  count: {
+    fontSize: 13,
+    fontWeight: '700' as const,
+  },
+});
 
 function MiniProgressBar({ positive, neutral, negative, total }: { positive: number; neutral: number; negative: number; total: number }) {
   if (total === 0) return <View style={barStyles.empty}><Text style={barStyles.emptyText}>Keine Daten</Text></View>;
 
   return (
     <View style={barStyles.container}>
-      <View style={barStyles.barBg}>
-        {positive > 0 && <View style={[barStyles.segment, { flex: positive, backgroundColor: Colors.positive }]} />}
-        {neutral > 0 && <View style={[barStyles.segment, { flex: neutral, backgroundColor: Colors.neutral }]} />}
-        {negative > 0 && <View style={[barStyles.segment, { flex: negative, backgroundColor: Colors.negative }]} />}
+      <View style={barStyles.statsRow}>
+        <StatBadge count={positive} type="+" />
+        <StatBadge count={neutral} type="o" />
+        <StatBadge count={negative} type="-" />
       </View>
-      <View style={barStyles.legend}>
-        <View style={barStyles.legendItem}>
-          <View style={[barStyles.legendDot, { backgroundColor: Colors.positive }]} />
-          <Text style={barStyles.legendText}>{positive}x +</Text>
-        </View>
-        <View style={barStyles.legendItem}>
-          <View style={[barStyles.legendDot, { backgroundColor: Colors.neutral }]} />
-          <Text style={barStyles.legendText}>{neutral}x o</Text>
-        </View>
-        <View style={barStyles.legendItem}>
-          <View style={[barStyles.legendDot, { backgroundColor: Colors.negative }]} />
-          <Text style={barStyles.legendText}>{negative}x −</Text>
-        </View>
+      <View style={barStyles.barBg}>
+        {positive > 0 && <View style={[barStyles.segment, { flex: positive, backgroundColor: Colors.positive, borderTopLeftRadius: 3, borderBottomLeftRadius: 3 }]} />}
+        {neutral > 0 && <View style={[barStyles.segment, { flex: neutral, backgroundColor: Colors.neutral }]} />}
+        {negative > 0 && <View style={[barStyles.segment, { flex: negative, backgroundColor: Colors.negative, borderTopRightRadius: 3, borderBottomRightRadius: 3 }]} />}
       </View>
     </View>
   );
@@ -48,37 +100,64 @@ function HomeworkBar({ done, late, missing, total }: { done: number; late: numbe
 
   return (
     <View style={barStyles.container}>
-      <View style={barStyles.barBg}>
-        {done > 0 && <View style={[barStyles.segment, { flex: done, backgroundColor: '#16A34A' }]} />}
-        {late > 0 && <View style={[barStyles.segment, { flex: late, backgroundColor: '#D97706' }]} />}
-        {missing > 0 && <View style={[barStyles.segment, { flex: missing, backgroundColor: Colors.negative }]} />}
+      <View style={barStyles.statsRow}>
+        <View style={[hwBadgeStyles.badge, { backgroundColor: '#F0FDF4', borderColor: 'rgba(22,163,74,0.15)' }]}>
+          <View style={[hwBadgeStyles.iconWrap, { backgroundColor: 'rgba(22,163,74,0.15)' }]}>
+            <Check size={11} color="#16A34A" strokeWidth={2.8} />
+          </View>
+          <Text style={[hwBadgeStyles.count, { color: '#16A34A' }]}>{done}</Text>
+        </View>
+        <View style={[hwBadgeStyles.badge, { backgroundColor: Colors.warningLight, borderColor: 'rgba(217,119,6,0.15)' }]}>
+          <View style={[hwBadgeStyles.iconWrap, { backgroundColor: 'rgba(217,119,6,0.15)' }]}>
+            <Clock size={10} color="#D97706" strokeWidth={2.8} />
+          </View>
+          <Text style={[hwBadgeStyles.count, { color: '#D97706' }]}>{late}</Text>
+        </View>
+        <View style={[hwBadgeStyles.badge, { backgroundColor: Colors.negativeLight, borderColor: 'rgba(204,59,42,0.15)' }]}>
+          <View style={[hwBadgeStyles.iconWrap, { backgroundColor: 'rgba(204,59,42,0.15)' }]}>
+            <X size={11} color={Colors.negative} strokeWidth={2.8} />
+          </View>
+          <Text style={[hwBadgeStyles.count, { color: Colors.negative }]}>{missing}</Text>
+        </View>
       </View>
-      <View style={barStyles.legend}>
-        <View style={barStyles.legendItem}>
-          <View style={[barStyles.legendDot, { backgroundColor: '#16A34A' }]} />
-          <Text style={barStyles.legendText}>{done}x Abgegeben</Text>
-        </View>
-        <View style={barStyles.legendItem}>
-          <View style={[barStyles.legendDot, { backgroundColor: '#D97706' }]} />
-          <Text style={barStyles.legendText}>{late}x Verspätet</Text>
-        </View>
-        <View style={barStyles.legendItem}>
-          <View style={[barStyles.legendDot, { backgroundColor: Colors.negative }]} />
-          <Text style={barStyles.legendText}>{missing}x Fehlt</Text>
-        </View>
+      <View style={barStyles.barBg}>
+        {done > 0 && <View style={[barStyles.segment, { flex: done, backgroundColor: '#16A34A', borderTopLeftRadius: 3, borderBottomLeftRadius: 3 }]} />}
+        {late > 0 && <View style={[barStyles.segment, { flex: late, backgroundColor: '#D97706' }]} />}
+        {missing > 0 && <View style={[barStyles.segment, { flex: missing, backgroundColor: Colors.negative, borderTopRightRadius: 3, borderBottomRightRadius: 3 }]} />}
       </View>
     </View>
   );
 }
 
+const hwBadgeStyles = StyleSheet.create({
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    paddingRight: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  iconWrap: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  count: {
+    fontSize: 13,
+    fontWeight: '700' as const,
+  },
+});
+
 const barStyles = StyleSheet.create({
-  container: { gap: 6 },
-  barBg: { height: 5, borderRadius: 2.5, backgroundColor: Colors.inputBg, flexDirection: 'row', overflow: 'hidden' },
-  segment: { height: 5 },
-  legend: { flexDirection: 'row', gap: 12, flexWrap: 'wrap' },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  legendDot: { width: 6, height: 6, borderRadius: 3 },
-  legendText: { fontSize: 11, color: Colors.textSecondary, fontWeight: '500' as const },
+  container: { gap: 8 },
+  statsRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  barBg: { height: 6, borderRadius: 3, backgroundColor: Colors.inputBg, flexDirection: 'row', overflow: 'hidden' },
+  segment: { height: 6 },
   empty: { paddingVertical: 4 },
   emptyText: { fontSize: 12, color: Colors.textLight },
 });
@@ -207,8 +286,16 @@ export default function StatisticsScreen() {
               <View key={`${item.classId}-${item.student.id}`} style={styles.card}>
                 <View style={styles.cardHeader}>
                   <View style={styles.cardLeft}>
-                    <View style={styles.avatar}>
-                      <Text style={styles.avatarText}>
+                    <View style={[
+                      styles.avatar,
+                      trend > 0 && styles.avatarPositive,
+                      trend < 0 && styles.avatarNegative,
+                    ]}>
+                      <Text style={[
+                        styles.avatarText,
+                        trend > 0 && { color: Colors.positive },
+                        trend < 0 && { color: Colors.negative },
+                      ]}>
                         {(item.student.firstName || '?')[0]}{(item.student.lastName || '?')[0]}
                       </Text>
                     </View>
@@ -222,6 +309,8 @@ export default function StatisticsScreen() {
                   {stats.total > 0 && (
                     <View style={[styles.trendBadge, {
                       backgroundColor: trend > 0 ? Colors.positiveLight : trend < 0 ? Colors.negativeLight : Colors.neutralLight,
+                      borderWidth: 1,
+                      borderColor: trend > 0 ? 'rgba(34,164,93,0.2)' : trend < 0 ? 'rgba(204,59,42,0.2)' : 'rgba(148,151,158,0.2)',
                     }]}>
                       {trend > 0 ? (
                         <TrendingUp size={13} color={Colors.positive} strokeWidth={2} />
@@ -235,29 +324,25 @@ export default function StatisticsScreen() {
                 </View>
 
                 <View style={styles.sectionLabel}>
-                  <Text style={styles.sectionLabelText}>Mitarbeit</Text>
+                  <View style={styles.sectionLabelRow}>
+                    <ThumbsUp size={12} color={Colors.textSecondary} strokeWidth={2} />
+                    <Text style={styles.sectionLabelText}>Mitarbeit</Text>
+                  </View>
+                  {stats.total > 0 && (
+                    <Text style={styles.totalCount}>{stats.total} Bewertungen</Text>
+                  )}
                 </View>
                 <MiniProgressBar {...stats} />
 
                 <View style={styles.sectionDivider} />
 
                 <View style={styles.sectionLabel}>
-                  <Text style={styles.sectionLabelText}>Hausaufgaben</Text>
+                  <View style={styles.sectionLabelRow}>
+                    <ThumbsDown size={12} color={Colors.textSecondary} strokeWidth={2} />
+                    <Text style={styles.sectionLabelText}>Hausaufgaben</Text>
+                  </View>
                   {hwStats.total > 0 && (
-                    <View style={styles.hwSummary}>
-                      <View style={styles.hwBadge}>
-                        <Check size={10} color="#16A34A" strokeWidth={2.5} />
-                        <Text style={[styles.hwBadgeText, { color: '#16A34A' }]}>{hwStats.done}</Text>
-                      </View>
-                      <View style={styles.hwBadge}>
-                        <Clock size={10} color="#D97706" strokeWidth={2.5} />
-                        <Text style={[styles.hwBadgeText, { color: '#D97706' }]}>{hwStats.late}</Text>
-                      </View>
-                      <View style={styles.hwBadge}>
-                        <X size={10} color={Colors.negative} strokeWidth={2.5} />
-                        <Text style={[styles.hwBadgeText, { color: Colors.negative }]}>{hwStats.missing}</Text>
-                      </View>
-                    </View>
+                    <Text style={styles.totalCount}>{hwStats.total} Einträge</Text>
                   )}
                 </View>
                 <HomeworkBar {...hwStats} />
@@ -296,7 +381,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.inputBg,
     borderRadius: 12,
     paddingHorizontal: 14,
     gap: 8,
@@ -311,7 +396,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.inputBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -330,7 +415,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 18,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.inputBg,
   },
   filterChipActive: {
     backgroundColor: Colors.primary,
@@ -348,7 +433,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 20,
-    gap: 8,
+    gap: 10,
     paddingBottom: 40,
   },
   emptyContainer: {
@@ -370,6 +455,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     gap: 10,
+    borderWidth: 1,
+    borderColor: Colors.divider,
     ...Platform.select({
       ios: { shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 1, shadowRadius: 8 },
       android: { elevation: 1 },
@@ -387,21 +474,31 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     backgroundColor: Colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  avatarPositive: {
+    backgroundColor: Colors.positiveLight,
+    borderWidth: 1.5,
+    borderColor: Colors.positive,
+  },
+  avatarNegative: {
+    backgroundColor: Colors.negativeLight,
+    borderWidth: 1.5,
+    borderColor: Colors.negative,
+  },
   avatarText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600' as const,
     color: Colors.primary,
   },
   studentName: {
     fontSize: 15,
-    fontWeight: '500' as const,
+    fontWeight: '600' as const,
     color: Colors.text,
   },
   className: {
@@ -410,8 +507,8 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   trendBadge: {
-    width: 30,
-    height: 30,
+    width: 32,
+    height: 32,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
@@ -422,6 +519,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 4,
   },
+  sectionLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
   sectionLabelText: {
     fontSize: 12,
     fontWeight: '600' as const,
@@ -429,22 +531,14 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase' as const,
     letterSpacing: 0.5,
   },
+  totalCount: {
+    fontSize: 11,
+    color: Colors.textLight,
+    fontWeight: '500' as const,
+  },
   sectionDivider: {
     height: 1,
     backgroundColor: Colors.divider,
     marginVertical: 2,
-  },
-  hwSummary: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  hwBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  hwBadgeText: {
-    fontSize: 11,
-    fontWeight: '600' as const,
   },
 });
