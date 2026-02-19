@@ -664,6 +664,19 @@ export const [AppProvider, useApp] = createContextHook(() => {
     [scheduleEntries, saveScheduleEntries]
   );
 
+  const addScheduleEntries = useCallback(
+    (entries: Omit<ScheduleEntry, 'id'>[]) => {
+      const newEntries: ScheduleEntry[] = entries.map((entry) => ({
+        ...entry,
+        id: generateId(),
+      }));
+      const updated = [...scheduleEntries, ...newEntries];
+      saveScheduleEntries(updated);
+      return newEntries;
+    },
+    [scheduleEntries, saveScheduleEntries]
+  );
+
   const deleteScheduleEntry = useCallback(
     (entryId: string) => {
       const updated = scheduleEntries.filter((e) => e.id !== entryId);
@@ -713,6 +726,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     scheduleEntries,
     scheduleTimeSettings,
     addScheduleEntry,
+    addScheduleEntries,
     deleteScheduleEntry,
     updateScheduleEntry,
     saveScheduleTimeSettings,

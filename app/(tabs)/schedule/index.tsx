@@ -222,6 +222,7 @@ export default function ScheduleScreen() {
     scheduleEntries,
     scheduleTimeSettings,
     addScheduleEntry,
+    addScheduleEntries,
     deleteScheduleEntry,
     saveScheduleTimeSettings,
     oneTimeEvents,
@@ -664,17 +665,16 @@ export default function ScheduleScreen() {
     }
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    for (const dayIdx of newDayIndices) {
-      addScheduleEntry({
-        dayIndex: dayIdx,
-        periodStart: sortedPeriods[0],
-        periodEnd: sortedPeriods[sortedPeriods.length - 1],
-        className: newClassName.trim(),
-        subject: newSubject.trim(),
-        room: newRoom.trim(),
-        color: newColor,
-      });
-    }
+    const entriesToAdd = newDayIndices.map((dayIdx) => ({
+      dayIndex: dayIdx,
+      periodStart: sortedPeriods[0],
+      periodEnd: sortedPeriods[sortedPeriods.length - 1],
+      className: newClassName.trim(),
+      subject: newSubject.trim(),
+      room: newRoom.trim(),
+      color: newColor,
+    }));
+    addScheduleEntries(entriesToAdd);
 
     setShowAddModal(false);
     resetAddForm();

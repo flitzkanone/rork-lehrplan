@@ -234,18 +234,18 @@ function ReasonMenu({
         },
       ]}
     >
-      {reasons.map((item, index) => (
+      {reasons.map((item) => (
         <TouchableOpacity
           key={item.reason}
           style={[
-            styles.reasonOption,
-            index < reasons.length - 1 && styles.reasonOptionBorder,
+            styles.reasonChip,
+            isNegative ? styles.reasonChipNegative : styles.reasonChipPositive,
           ]}
           onPress={() => onSelect(item.reason)}
           activeOpacity={0.6}
         >
           {item.icon}
-          <Text style={[styles.reasonLabel, isNegative && styles.reasonLabelNegative]}>
+          <Text style={[styles.reasonChipLabel, isNegative && styles.reasonChipLabelNegative]} numberOfLines={1}>
             {item.label}
           </Text>
         </TouchableOpacity>
@@ -936,42 +936,42 @@ const styles = StyleSheet.create({
   },
   reasonMenu: {
     marginTop: 6,
-    borderRadius: 14,
-    overflow: 'hidden',
+    flexDirection: 'row',
+    gap: 6,
     zIndex: 20,
+  },
+  reasonMenuPositive: {},
+  reasonMenuNegative: {},
+  reasonChip: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    borderWidth: 1,
     ...Platform.select({
-      ios: { shadowColor: 'rgba(0,0,0,0.12)', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 12 },
-      android: { elevation: 4 },
+      ios: { shadowColor: 'rgba(0,0,0,0.06)', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 1, shadowRadius: 4 },
+      android: { elevation: 1 },
       default: {},
     }),
   },
-  reasonMenuPositive: {
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.divider,
+  reasonChipPositive: {
+    backgroundColor: Colors.positiveLight,
+    borderColor: Colors.positive,
   },
-  reasonMenuNegative: {
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: '#F0D4D0',
+  reasonChipNegative: {
+    backgroundColor: Colors.negativeLight,
+    borderColor: Colors.negative,
   },
-  reasonOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  reasonOptionBorder: {
-    borderBottomWidth: 0.5,
-    borderBottomColor: Colors.divider,
-  },
-  reasonLabel: {
-    fontSize: 15,
-    fontWeight: '500' as const,
+  reasonChipLabel: {
+    fontSize: 11,
+    fontWeight: '600' as const,
     color: Colors.text,
   },
-  reasonLabelNegative: {
+  reasonChipLabelNegative: {
     color: Colors.negative,
   },
 });

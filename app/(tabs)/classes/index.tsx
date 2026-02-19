@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Plus, Users, ChevronRight, Trash2, X } from 'lucide-react-native';
+import { Plus, Users, ChevronRight, Trash2, X, Search } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useApp } from '@/context/AppContext';
@@ -27,6 +27,20 @@ export default function ClassesScreen() {
   const [showModal, setShowModal] = useState<boolean>(false);
   const [newClassName, setNewClassName] = useState<string>('');
   const [isCreating, setIsCreating] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  const filteredClasses = React.useMemo(() => {
+    if (!searchQuery.trim()) return data.classes;
+    const q = searchQuery.toLowerCase().trim();
+    return data.classes.filter((cls) => {
+      if (cls.name.toLowerCase().includes(q)) return true;
+      return cls.students.some(
+        (s) =>
+          s.firstName.toLowerCase().includes(q) ||
+          s.lastName.toLowerCase().includes(q)
+      );
+    });
+  }, [data.classes, searchQuery]);
 
   const handleCreate = useCallback(async () => {
     if (!newClassName.trim()) {
@@ -101,14 +115,32 @@ export default function ClassesScreen() {
   return (
     <View style={styles.container}>
       <FlatList
-        data={data.classes}
+        data={filteredClasses}
         keyExtractor={(item) => item.id}
         renderItem={renderClass}
         contentContainerStyle={[styles.listContent, { paddingTop: insets.top + 16 }]}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
-          <Text style={styles.screenTitle}>Klassen</Text>
+          <View>
+            <Text style={styles.screenTitle}>Klassen</Text>
+            <View style={styles.searchContainer}>
+              <Search size={16} color={Colors.textLight} strokeWidth={1.8} />
+              <TextInput
+                style={styles.searchInput}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Klasse oder Schüler suchen..."
+                placeholderTextColor={Colors.textLight}
+                testID="search-classes"
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <X size={16} color={Colors.textSecondary} strokeWidth={1.8} />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -185,7 +217,25 @@ const styles = StyleSheet.create({
     fontWeight: '700' as const,
     color: Colors.text,
     letterSpacing: -0.5,
-    marginBottom: 24,
+    marginBottom: 16,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: Platform.OS === 'ios' ? 10 : 4,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    gap: 10,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: Colors.text,
+    padding: 0,
   },
   classCard: {
     flexDirection: 'row',
