@@ -9,10 +9,11 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Fingerprint, Delete, RotateCcw, X } from 'lucide-react-native';
+import { Fingerprint, Lock, RotateCcw, X } from 'lucide-react-native';
 import { DelayedActivityIndicator } from '@/components/DelayedLoader';
 import * as Haptics from 'expo-haptics';
 import * as SecureStore from 'expo-secure-store';
@@ -27,18 +28,25 @@ export default function LockScreen() {
   const { authenticateWithPin, recoveryAvailable, recoverFromBackup, isRecovering, dismissRecovery } = useApp();
   const [enteredPin, setEnteredPin] = useState<string>('');
   const [error, setError] = useState<boolean>(false);
+  const [errorText, setErrorText] = useState<string>('');
   const [isChecking, setIsChecking] = useState<boolean>(false);
   const [showRecoveryModal, setShowRecoveryModal] = useState<boolean>(false);
   const [recoveryPin, setRecoveryPin] = useState<string>('');
   const [recoveryError, setRecoveryError] = useState<string>('');
+  const [biometricFailed, setBiometricFailed] = useState<boolean>(false);
   const shakeAnim = useRef(new Animated.Value(0)).current;
+  const pinInputRef = useRef<TextInput>(null);
 
   const tryBiometric = useCallback(async () => {
-    if (Platform.OS === 'web') return;
+    if (Platform.OS === 'web') {
+      setBiometricFailed(true);
+      return;
+    }
     try {
       const storedPin = await SecureStore.getItemAsync(BIOMETRIC_PIN_KEY);
       if (!storedPin) {
         console.log('[Lock] No stored PIN for biometric auth');
+        setBiometricFailed(true);
         return;
       }
 
@@ -56,20 +64,31 @@ export default function LockScreen() {
           if (authSuccess) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             router.replace('/');
+            return;
           } else {
             console.log('[Lock] Biometric OK but PIN auth failed - PIN may have changed');
             await SecureStore.deleteItemAsync(BIOMETRIC_PIN_KEY);
           }
         }
       }
+      setBiometricFailed(true);
     } catch (e) {
       console.log('Biometric auth not available:', e);
+      setBiometricFailed(true);
     }
   }, [router, authenticateWithPin]);
 
   useEffect(() => {
     tryBiometric();
   }, [tryBiometric]);
+
+  useEffect(() => {
+    if (biometricFailed) {
+      setTimeout(() => {
+        pinInputRef.current?.focus();
+      }, 300);
+    }
+  }, [biometricFailed]);
 
   const shakeAnimation = useCallback(() => {
     Animated.sequence([
@@ -100,11 +119,14 @@ export default function LockScreen() {
         setIsChecking(false);
         if (pinToCheck.length === 6) {
           setError(true);
+          setErrorText('Falsche PIN');
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
           shakeAnimation();
           setTimeout(() => {
             setEnteredPin('');
             setError(false);
+            setErrorText('');
+            pinInputRef.current?.focus();
           }, 600);
         }
       }
@@ -114,16 +136,15 @@ export default function LockScreen() {
     }
   }, [enteredPin, authenticateWithPin, router, shakeAnimation, isChecking]);
 
-  const handleDigit = (digit: string) => {
-    if (enteredPin.length < 6) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      setEnteredPin((prev) => prev + digit);
+  const handlePinChange = (text: string) => {
+    const numericOnly = text.replace(/[^0-9]/g, '');
+    if (numericOnly.length <= 6) {
+      setEnteredPin(numericOnly);
+      if (error) {
+        setError(false);
+        setErrorText('');
+      }
     }
-  };
-
-  const handleDelete = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setEnteredPin((prev) => prev.slice(0, -1));
   };
 
   const handleRecovery = async () => {
@@ -134,7 +155,7 @@ export default function LockScreen() {
 
     setRecoveryError('');
     const success = await recoverFromBackup(recoveryAvailable.id, recoveryPin);
-    
+
     if (success) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowRecoveryModal(false);
@@ -151,94 +172,76 @@ export default function LockScreen() {
   };
 
   const pinLength = 6;
-  const showBiometric = Platform.OS !== 'web';
 
   return (
     <View style={styles.root}>
       <SafeAreaView style={styles.container}>
-        <View style={styles.top}>
-          <Text style={styles.title}>Entsperren</Text>
-          <Text style={styles.subtitle}>PIN eingeben</Text>
-
-          <Animated.View
-            style={[styles.dotsRow, { transform: [{ translateX: shakeAnim }] }]}
-          >
-            {Array.from({ length: pinLength }).map((_, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.dot,
-                  i < enteredPin.length && styles.dotFilled,
-                  error && i < enteredPin.length && styles.dotError,
-                ]}
-              />
-            ))}
-          </Animated.View>
-          {error && <Text style={styles.errorText}>Falsche PIN</Text>}
-          <DelayedActivityIndicator visible={isChecking} delay={1000} size="small" />
-        </View>
-
-        {recoveryAvailable && (
-          <TouchableOpacity
-            style={styles.recoveryBanner}
-            onPress={() => setShowRecoveryModal(true)}
-            activeOpacity={0.7}
-          >
-            <RotateCcw size={16} color={Colors.primary} strokeWidth={1.7} />
-            <Text style={styles.recoveryBannerText}>Backup verfügbar - Tippen zum Wiederherstellen</Text>
-          </TouchableOpacity>
-        )}
-
-        <View style={styles.keypad}>
-          {[
-            ['1', '2', '3'],
-            ['4', '5', '6'],
-            ['7', '8', '9'],
-            [showBiometric ? 'bio' : 'empty', '0', 'del'],
-          ].map((row, ri) => (
-            <View key={ri} style={styles.keypadRow}>
-              {row.map((key) => {
-                if (key === 'empty') {
-                  return <View key={key} style={styles.keyBtn} />;
-                }
-                if (key === 'bio') {
-                  return (
-                    <TouchableOpacity
-                      key={key}
-                      style={styles.keyBtn}
-                      onPress={tryBiometric}
-                      activeOpacity={0.5}
-                    >
-                      <Fingerprint size={22} color={Colors.primary} strokeWidth={1.5} />
-                    </TouchableOpacity>
-                  );
-                }
-                if (key === 'del') {
-                  return (
-                    <TouchableOpacity
-                      key={key}
-                      style={styles.keyBtn}
-                      onPress={handleDelete}
-                      activeOpacity={0.5}
-                    >
-                      <Delete size={22} color={Colors.textSecondary} strokeWidth={1.5} />
-                    </TouchableOpacity>
-                  );
-                }
-                return (
-                  <TouchableOpacity
-                    key={key}
-                    style={styles.keyBtn}
-                    onPress={() => handleDigit(key)}
-                    activeOpacity={0.5}
-                  >
-                    <Text style={styles.keyText}>{key}</Text>
-                  </TouchableOpacity>
-                );
-              })}
+        <KeyboardAvoidingView
+          style={styles.inner}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
+        >
+          <View style={styles.top}>
+            <View style={styles.iconContainer}>
+              <Lock size={32} color={Colors.primary} strokeWidth={1.8} />
             </View>
-          ))}
-        </View>
+            <Text style={styles.title}>Entsperren</Text>
+            <Text style={styles.subtitle}>PIN eingeben</Text>
+
+            <Animated.View
+              style={[styles.dotsRow, { transform: [{ translateX: shakeAnim }] }]}
+            >
+              {Array.from({ length: pinLength }).map((_, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.dot,
+                    i < enteredPin.length && styles.dotFilled,
+                    error && i < enteredPin.length && styles.dotError,
+                  ]}
+                />
+              ))}
+            </Animated.View>
+
+            <TextInput
+              ref={pinInputRef}
+              style={styles.hiddenInput}
+              value={enteredPin}
+              onChangeText={handlePinChange}
+              keyboardType="number-pad"
+              secureTextEntry
+              maxLength={6}
+              autoFocus={false}
+              caretHidden
+              testID="pin-input"
+            />
+
+            {error && <Text style={styles.errorText}>{errorText}</Text>}
+            <DelayedActivityIndicator visible={isChecking} delay={1000} size="small" />
+
+            {Platform.OS !== 'web' && (
+              <TouchableOpacity
+                style={styles.biometricBtn}
+                onPress={tryBiometric}
+                activeOpacity={0.6}
+              >
+                <Fingerprint size={24} color={Colors.primary} strokeWidth={1.5} />
+                <Text style={styles.biometricText}>Biometrisch entsperren</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {recoveryAvailable && (
+            <TouchableOpacity
+              style={styles.recoveryBanner}
+              onPress={() => setShowRecoveryModal(true)}
+              activeOpacity={0.7}
+            >
+              <RotateCcw size={16} color={Colors.primary} strokeWidth={1.7} />
+              <Text style={styles.recoveryBannerText}>Backup verfügbar - Tippen zum Wiederherstellen</Text>
+            </TouchableOpacity>
+          )}
+        </KeyboardAvoidingView>
 
         <Modal visible={showRecoveryModal} transparent animationType="fade">
           <View style={styles.modalOverlay}>
@@ -307,11 +310,23 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    justifyContent: 'space-between',
+  },
+  inner: {
+    flex: 1,
+    justifyContent: 'center',
   },
   top: {
     alignItems: 'center',
-    paddingTop: 80,
+    paddingHorizontal: 32,
+  },
+  iconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
   },
   title: {
     fontSize: 26,
@@ -328,6 +343,7 @@ const styles = StyleSheet.create({
   dotsRow: {
     flexDirection: 'row',
     gap: 18,
+    marginBottom: 16,
   },
   dot: {
     width: 14,
@@ -345,35 +361,32 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.negative,
     borderColor: Colors.negative,
   },
+  hiddenInput: {
+    position: 'absolute',
+    width: 1,
+    height: 1,
+    opacity: 0,
+  },
   errorText: {
     color: Colors.negative,
     fontSize: 14,
-    marginTop: 14,
+    marginTop: 8,
     fontWeight: '500' as const,
   },
-  keypad: {
-    paddingHorizontal: 52,
-    paddingBottom: 24,
-    gap: 10,
-  },
-  keypadRow: {
+  biometricBtn: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  keyBtn: {
-    flex: 1,
-    aspectRatio: 1.6,
-    maxHeight: 60,
-    borderRadius: 14,
-    backgroundColor: Colors.inputBg,
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 8,
+    marginTop: 32,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: Colors.primaryLight,
   },
-  keyText: {
-    fontSize: 26,
-    fontWeight: '400' as const,
-    color: Colors.text,
+  biometricText: {
+    fontSize: 14,
+    fontWeight: '500' as const,
+    color: Colors.primary,
   },
   recoveryBanner: {
     flexDirection: 'row',
