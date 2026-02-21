@@ -207,7 +207,7 @@ function ReasonMenu({
   onClose: () => void;
 }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.9)).current;
+  const scaleAnim = useRef(new Animated.Value(0.95)).current;
 
   React.useEffect(() => {
     if (visible) {
@@ -217,7 +217,7 @@ function ReasonMenu({
       ]).start();
     } else {
       fadeAnim.setValue(0);
-      scaleAnim.setValue(0.9);
+      scaleAnim.setValue(0.95);
     }
   }, [visible, fadeAnim, scaleAnim]);
 
@@ -240,10 +240,17 @@ function ReasonMenu({
             styles.reasonBtn,
             isNegative ? styles.reasonBtnNegative : styles.reasonBtnPositive,
           ]}
-          onPress={() => onSelect(item.reason)}
+          onPress={() => {
+            console.log('[ReasonMenu] Selected reason:', item.reason);
+            onSelect(item.reason);
+          }}
           activeOpacity={0.6}
         >
           {item.icon}
+          <Text style={[
+            styles.reasonBtnLabel,
+            isNegative ? styles.reasonBtnLabelNeg : styles.reasonBtnLabelPos,
+          ]}>{item.label}</Text>
         </TouchableOpacity>
       ))}
     </Animated.View>
@@ -552,7 +559,7 @@ export default function LessonActiveScreen() {
               const menuIsNegative = isMenuOpen && openMenuType === '-';
 
               return (
-                <View key={student.id} style={styles.studentCard}>
+                <View key={student.id} style={[styles.studentCard, isMenuOpen && styles.studentCardOpen]}>
                   <View style={styles.studentRow}>
                     <View style={styles.studentInfo}>
                       <View style={[
@@ -930,20 +937,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  studentCardOpen: {
+    zIndex: 30,
+  },
   reasonMenu: {
     marginTop: 6,
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     gap: 6,
     zIndex: 20,
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    padding: 6,
+    ...Platform.select({
+      ios: { shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 1, shadowRadius: 6 },
+      android: { elevation: 3 },
+      default: {},
+    }),
   },
   reasonBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
-    borderWidth: 1.5,
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    borderWidth: 1.5,
+  },
+  reasonBtnLabel: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+  },
+  reasonBtnLabelPos: {
+    color: Colors.positive,
+  },
+  reasonBtnLabelNeg: {
+    color: Colors.negative,
   },
   reasonBtnPositive: {
     backgroundColor: Colors.positiveLight,
