@@ -9,10 +9,11 @@ import {
   Animated,
   Platform,
   Pressable,
+  TextInput,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Plus, Minus, Circle, CheckCircle, Users, ThumbsUp, ThumbsDown, HandHelping, EyeOff, Volume2, FileX, BookOpen, Check, X, Clock } from 'lucide-react-native';
+import { Plus, Minus, Circle, CheckCircle, Users, ThumbsUp, ThumbsDown, HandHelping, EyeOff, Volume2, FileX, BookOpen, Check, X, Clock, Search } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useApp } from '@/context/AppContext';
@@ -278,6 +279,7 @@ export default function LessonActiveScreen() {
   const [openMenuStudentId, setOpenMenuStudentId] = useState<string | null>(null);
   const [openMenuType, setOpenMenuType] = useState<'+' | '-' | null>(null);
   const [homeworkMode, setHomeworkMode] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   const currentClass = data.classes.find((c) => c.id === session?.classId);
 
@@ -477,8 +479,32 @@ export default function LessonActiveScreen() {
           )}
         </View>
 
+        <View style={styles.searchRow}>
+          <View style={styles.searchBox}>
+            <Search size={15} color={Colors.textLight} strokeWidth={1.7} />
+            <TextInput
+              style={styles.searchInput}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Schüler suchen..."
+              placeholderTextColor={Colors.textLight}
+              testID="search-students"
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <X size={15} color={Colors.textSecondary} strokeWidth={1.8} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
         <ScrollView style={styles.list} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
           {currentClass.students
+            .filter((s) => {
+              if (!searchQuery.trim()) return true;
+              const q = searchQuery.toLowerCase();
+              return s.firstName.toLowerCase().includes(q) || s.lastName.toLowerCase().includes(q);
+            })
             .sort((a, b) => a.lastName.localeCompare(b.lastName))
             .map((student) => {
               if (homeworkMode) {
@@ -803,6 +829,25 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textSecondary,
     fontWeight: '500' as const,
+  },
+  searchRow: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.inputBg,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: Colors.text,
   },
   list: {
     flex: 1,

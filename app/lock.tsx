@@ -25,7 +25,7 @@ const BIOMETRIC_PIN_KEY = 'teacher_app_biometric_pin';
 
 export default function LockScreen() {
   const router = useRouter();
-  const { authenticateWithPin, recoveryAvailable, recoverFromBackup, isRecovering, dismissRecovery } = useApp();
+  const { authenticateWithPin, recoveryAvailable, recoverFromBackup, isRecovering, dismissRecovery, pinLength } = useApp();
   const [enteredPin, setEnteredPin] = useState<string>('');
   const [error, setError] = useState<boolean>(false);
   const [errorText, setErrorText] = useState<string>('');
@@ -34,8 +34,35 @@ export default function LockScreen() {
   const [recoveryPin, setRecoveryPin] = useState<string>('');
   const [recoveryError, setRecoveryError] = useState<string>('');
   const [biometricFailed, setBiometricFailed] = useState<boolean>(false);
+  const [successUnlock, setSuccessUnlock] = useState<boolean>(false);
   const shakeAnim = useRef(new Animated.Value(0)).current;
+  const successScaleAnim = useRef(new Animated.Value(1)).current;
+  const successOpacityAnim = useRef(new Animated.Value(1)).current;
   const pinInputRef = useRef<TextInput>(null);
+
+  const actualPinLength = pinLength ?? 6;
+
+  const playSuccessAnimation = useCallback(() => {
+    setSuccessUnlock(true);
+    Animated.sequence([
+      Animated.parallel([
+        Animated.timing(successScaleAnim, { toValue: 1.25, duration: 150, useNativeDriver: true }),
+        Animated.timing(successOpacityAnim, { toValue: 0.5, duration: 150, useNativeDriver: true }),
+      ]),
+      Animated.parallel([
+        Animated.timing(successScaleAnim, { toValue: 1, duration: 150, useNativeDriver: true }),
+        Animated.timing(successOpacityAnim, { toValue: 1, duration: 150, useNativeDriver: true }),
+      ]),
+      Animated.parallel([
+        Animated.timing(successScaleAnim, { toValue: 1.15, duration: 120, useNativeDriver: true }),
+        Animated.timing(successOpacityAnim, { toValue: 0.6, duration: 120, useNativeDriver: true }),
+      ]),
+      Animated.parallel([
+        Animated.timing(successScaleAnim, { toValue: 1, duration: 120, useNativeDriver: true }),
+        Animated.timing(successOpacityAnim, { toValue: 1, duration: 120, useNativeDriver: true }),
+      ]),
+    ]).start();
+  }, [successScaleAnim, successOpacityAnim]);
 
   const tryBiometric = useCallback(async () => {
     if (Platform.OS === 'web') {
@@ -63,7 +90,9 @@ export default function LockScreen() {
           const authSuccess = await authenticateWithPin(storedPin);
           if (authSuccess) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            router.replace('/');
+            setEnteredPin(storedPin);
+            playSuccessAnimation();
+            setTimeout(() => router.replace('/'), 500);
             return;
           } else {
             console.log('[Lock] Biometric OK but PIN auth failed - PIN may have changed');
@@ -101,7 +130,7 @@ export default function LockScreen() {
 
   useEffect(() => {
     const checkPin = async () => {
-      if (isChecking) return;
+      if (isChecking || successUnlock) return;
       if (enteredPin.length >= 4 && enteredPin.length <= 6) {
         setIsChecking(true);
         const pinToCheck = enteredPin;
@@ -113,11 +142,12 @@ export default function LockScreen() {
               console.log('[Lock] Failed to store PIN for biometric:', e)
             );
           }
-          router.replace('/');
+          playSuccessAnimation();
+          setTimeout(() => router.replace('/'), 500);
           return;
         }
         setIsChecking(false);
-        if (pinToCheck.length === 6) {
+        if (pinToCheck.length === actualPinLength) {
           setError(true);
           setErrorText('Falsche PIN');
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -134,11 +164,12 @@ export default function LockScreen() {
     if (enteredPin.length >= 4) {
       checkPin();
     }
-  }, [enteredPin, authenticateWithPin, router, shakeAnimation, isChecking]);
+  }, [enteredPin, authenticateWithPin, router, shakeAnimation, isChecking, successUnlock, playSuccessAnimation, actualPinLength]);
 
   const handlePinChange = (text: string) => {
+    if (successUnlock) return;
     const numericOnly = text.replace(/[^0-9]/g, '');
-    if (numericOnly.length <= 6) {
+    if (numericOnly.length <= actualPinLength) {
       setEnteredPin(numericOnly);
       if (error) {
         setError(false);
@@ -171,8 +202,6 @@ export default function LockScreen() {
     setShowRecoveryModal(false);
   };
 
-  const pinLength = 6;
-
   return (
     <View style={styles.root}>
       <SafeAreaView style={styles.container}>
@@ -182,22 +211,32 @@ export default function LockScreen() {
           keyboardVerticalOffset={0}
         >
           <View style={styles.top}>
-            <View style={styles.iconContainer}>
-              <Lock size={32} color={Colors.primary} strokeWidth={1.8} />
+            <View style={[styles.iconContainer, successUnlock && styles.iconContainerSuccess]}>
+              <Lock size={32} color={successUnlock ? Colors.positive : Colors.primary} strokeWidth={1.8} />
             </View>
             <Text style={styles.title}>Entsperren</Text>
             <Text style={styles.subtitle}>PIN eingeben</Text>
 
             <Animated.View
-              style={[styles.dotsRow, { transform: [{ translateX: shakeAnim }] }]}
+              style={[
+                styles.dotsRow,
+                {
+                  transform: [
+                    { translateX: shakeAnim },
+                    { scale: successScaleAnim },
+                  ],
+                  opacity: successOpacityAnim,
+                },
+              ]}
             >
-              {Array.from({ length: pinLength }).map((_, i) => (
+              {Array.from({ length: actualPinLength }).map((_, i) => (
                 <View
                   key={i}
                   style={[
                     styles.dot,
                     i < enteredPin.length && styles.dotFilled,
                     error && i < enteredPin.length && styles.dotError,
+                    successUnlock && i < enteredPin.length && styles.dotSuccess,
                   ]}
                 />
               ))}
@@ -210,7 +249,7 @@ export default function LockScreen() {
               onChangeText={handlePinChange}
               keyboardType="number-pad"
               secureTextEntry
-              maxLength={6}
+              maxLength={actualPinLength}
               autoFocus={false}
               caretHidden
               testID="pin-input"
@@ -360,6 +399,13 @@ const styles = StyleSheet.create({
   dotError: {
     backgroundColor: Colors.negative,
     borderColor: Colors.negative,
+  },
+  dotSuccess: {
+    backgroundColor: Colors.positive,
+    borderColor: Colors.positive,
+  },
+  iconContainerSuccess: {
+    backgroundColor: Colors.positiveLight,
   },
   hiddenInput: {
     position: 'absolute',

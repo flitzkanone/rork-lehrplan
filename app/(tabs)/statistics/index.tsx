@@ -9,7 +9,7 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Search, Filter, TrendingUp, TrendingDown, Minus, Circle, Check, X, Clock, ThumbsUp, ThumbsDown } from 'lucide-react-native';
+import { Search, Filter, TrendingUp, TrendingDown, Minus, Circle, Check, X, Clock, ThumbsUp, ThumbsDown, BookOpen } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useApp } from '@/context/AppContext';
 import { StatisticsScreenSkeleton } from '@/components/SkeletonLoader';
@@ -167,6 +167,7 @@ export default function StatisticsScreen() {
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState<string>('');
   const [filterSubject, setFilterSubject] = useState<string | null>(null);
+  const [filterCategory, setFilterCategory] = useState<'all' | 'participation' | 'homework'>('all');
   const [showFilters, setShowFilters] = useState<boolean>(false);
 
   const allStudentsWithClass = useMemo(() => {
@@ -252,23 +253,47 @@ export default function StatisticsScreen() {
       </View>
 
       {showFilters && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow} contentContainerStyle={styles.filterRowContent}>
-          <TouchableOpacity
-            style={[styles.filterChip, !filterSubject && styles.filterChipActive]}
-            onPress={() => setFilterSubject(null)}
-          >
-            <Text style={[styles.filterChipText, !filterSubject && styles.filterChipTextActive]}>Alle</Text>
-          </TouchableOpacity>
-          {data.profile.subjects.map((s) => (
+        <View style={styles.filtersWrap}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow} contentContainerStyle={styles.filterRowContent}>
             <TouchableOpacity
-              key={s}
-              style={[styles.filterChip, filterSubject === s && styles.filterChipActive]}
-              onPress={() => setFilterSubject(s)}
+              style={[styles.filterChip, !filterSubject && styles.filterChipActive]}
+              onPress={() => setFilterSubject(null)}
             >
-              <Text style={[styles.filterChipText, filterSubject === s && styles.filterChipTextActive]}>{s}</Text>
+              <Text style={[styles.filterChipText, !filterSubject && styles.filterChipTextActive]}>Alle Fächer</Text>
             </TouchableOpacity>
-          ))}
-        </ScrollView>
+            {data.profile.subjects.map((s) => (
+              <TouchableOpacity
+                key={s}
+                style={[styles.filterChip, filterSubject === s && styles.filterChipActive]}
+                onPress={() => setFilterSubject(s)}
+              >
+                <Text style={[styles.filterChipText, filterSubject === s && styles.filterChipTextActive]}>{s}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow} contentContainerStyle={styles.filterRowContent}>
+            <TouchableOpacity
+              style={[styles.categoryChip, filterCategory === 'all' && styles.categoryChipActive]}
+              onPress={() => setFilterCategory('all')}
+            >
+              <Text style={[styles.categoryChipText, filterCategory === 'all' && styles.categoryChipTextActive]}>Alles</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.categoryChip, filterCategory === 'participation' && styles.categoryChipActive]}
+              onPress={() => setFilterCategory('participation')}
+            >
+              <ThumbsUp size={12} color={filterCategory === 'participation' ? Colors.white : Colors.textSecondary} strokeWidth={2} />
+              <Text style={[styles.categoryChipText, filterCategory === 'participation' && styles.categoryChipTextActive]}>Mitarbeit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.categoryChip, filterCategory === 'homework' && styles.categoryChipActive]}
+              onPress={() => setFilterCategory('homework')}
+            >
+              <BookOpen size={12} color={filterCategory === 'homework' ? Colors.white : Colors.textSecondary} strokeWidth={2} />
+              <Text style={[styles.categoryChipText, filterCategory === 'homework' && styles.categoryChipTextActive]}>Hausaufgaben</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
       )}
 
       <ScrollView style={styles.list} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
@@ -323,29 +348,37 @@ export default function StatisticsScreen() {
                   )}
                 </View>
 
-                <View style={styles.sectionLabel}>
-                  <View style={styles.sectionLabelRow}>
-                    <ThumbsUp size={12} color={Colors.textSecondary} strokeWidth={2} />
-                    <Text style={styles.sectionLabelText}>Mitarbeit</Text>
-                  </View>
-                  {stats.total > 0 && (
-                    <Text style={styles.totalCount}>{stats.total} Bewertungen</Text>
-                  )}
-                </View>
-                <MiniProgressBar {...stats} />
+                {(filterCategory === 'all' || filterCategory === 'participation') && (
+                  <>
+                    <View style={styles.sectionLabel}>
+                      <View style={styles.sectionLabelRow}>
+                        <ThumbsUp size={12} color={Colors.textSecondary} strokeWidth={2} />
+                        <Text style={styles.sectionLabelText}>Mitarbeit</Text>
+                      </View>
+                      {stats.total > 0 && (
+                        <Text style={styles.totalCount}>{stats.total} Bewertungen</Text>
+                      )}
+                    </View>
+                    <MiniProgressBar {...stats} />
+                  </>
+                )}
 
-                <View style={styles.sectionDivider} />
+                {filterCategory === 'all' && <View style={styles.sectionDivider} />}
 
-                <View style={styles.sectionLabel}>
-                  <View style={styles.sectionLabelRow}>
-                    <ThumbsDown size={12} color={Colors.textSecondary} strokeWidth={2} />
-                    <Text style={styles.sectionLabelText}>Hausaufgaben</Text>
-                  </View>
-                  {hwStats.total > 0 && (
-                    <Text style={styles.totalCount}>{hwStats.total} Einträge</Text>
-                  )}
-                </View>
-                <HomeworkBar {...hwStats} />
+                {(filterCategory === 'all' || filterCategory === 'homework') && (
+                  <>
+                    <View style={styles.sectionLabel}>
+                      <View style={styles.sectionLabelRow}>
+                        <BookOpen size={12} color={Colors.textSecondary} strokeWidth={2} />
+                        <Text style={styles.sectionLabelText}>Hausaufgaben</Text>
+                      </View>
+                      {hwStats.total > 0 && (
+                        <Text style={styles.totalCount}>{hwStats.total} Einträge</Text>
+                      )}
+                    </View>
+                    <HomeworkBar {...hwStats} />
+                  </>
+                )}
               </View>
             );
           })
@@ -403,6 +436,10 @@ const styles = StyleSheet.create({
   filterBtnActive: {
     backgroundColor: Colors.primary,
   },
+  filtersWrap: {
+    gap: 8,
+    paddingBottom: 4,
+  },
   filterRow: {
     maxHeight: 42,
   },
@@ -410,6 +447,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     gap: 8,
     alignItems: 'center',
+  },
+  categoryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 18,
+    backgroundColor: Colors.inputBg,
+  },
+  categoryChipActive: {
+    backgroundColor: Colors.primary,
+  },
+  categoryChipText: {
+    fontSize: 13,
+    fontWeight: '500' as const,
+    color: Colors.text,
+  },
+  categoryChipTextActive: {
+    color: Colors.white,
   },
   filterChip: {
     paddingHorizontal: 14,

@@ -222,20 +222,17 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.inputBg,
     borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: Platform.OS === 'ios' ? 10 : 4,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    gap: 10,
+    gap: 8,
   },
   searchInput: {
     flex: 1,
+    paddingVertical: 12,
     fontSize: 15,
     color: Colors.text,
-    padding: 0,
   },
   classCard: {
     flexDirection: 'row',

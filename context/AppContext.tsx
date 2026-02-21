@@ -38,6 +38,7 @@ const SCHEDULE_ENTRIES_KEY = 'teacher_app_schedule_entries';
 const SCHEDULE_SETTINGS_KEY = 'teacher_app_schedule_settings';
 const ONE_TIME_EVENTS_KEY = 'teacher_app_one_time_events';
 const SUBSTITUTIONS_KEY = 'teacher_app_substitutions';
+const PIN_LENGTH_KEY = 'teacher_app_pin_length';
 
 const defaultData: AppData = {
   profile: { name: '', school: '', subjects: [] },
@@ -67,6 +68,14 @@ export const [AppProvider, useApp] = createContextHook(() => {
     queryFn: async () => {
       const hash = await AsyncStorage.getItem(PIN_HASH_KEY);
       return hash || '';
+    },
+  });
+
+  const pinLengthQuery = useQuery({
+    queryKey: ['pinLength'],
+    queryFn: async () => {
+      const len = await AsyncStorage.getItem(PIN_LENGTH_KEY);
+      return len ? parseInt(len, 10) : 6;
     },
   });
 
@@ -229,7 +238,9 @@ export const [AppProvider, useApp] = createContextHook(() => {
       currentPinRef.current = pin;
       const pinHashValue = hashPin(pin);
       await AsyncStorage.setItem(PIN_HASH_KEY, pinHashValue);
+      await AsyncStorage.setItem(PIN_LENGTH_KEY, String(pin.length));
       queryClient.setQueryData(['pinHash'], pinHashValue);
+      queryClient.setQueryData(['pinLength'], pin.length);
       const newData: AppData = {
         ...defaultData,
         profile,
@@ -260,7 +271,9 @@ export const [AppProvider, useApp] = createContextHook(() => {
       const newPinHash = hashPin(newPin);
       currentPinRef.current = newPin;
       await AsyncStorage.setItem(PIN_HASH_KEY, newPinHash);
+      await AsyncStorage.setItem(PIN_LENGTH_KEY, String(newPin.length));
       queryClient.setQueryData(['pinHash'], newPinHash);
+      queryClient.setQueryData(['pinLength'], newPin.length);
       save((prev) => ({ ...prev, pinHash: newPinHash }));
     },
     [save, queryClient]
@@ -744,6 +757,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     isLoading: dataQuery.isLoading || pinHashQuery.isLoading || privacyQuery.isLoading,
     isAuthenticated,
     storedPinHash: pinHashQuery.data || '',
+    pinLength: pinLengthQuery.data ?? 6,
     recoveryAvailable,
     isRecovering,
     privacyAccepted,
