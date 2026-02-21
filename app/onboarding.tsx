@@ -295,7 +295,7 @@ export default function OnboardingScreen() {
   const handlePickBackupFile = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/json', 'text/plain', '*/*'],
+        type: '*/*',
         copyToCacheDirectory: true,
       });
       

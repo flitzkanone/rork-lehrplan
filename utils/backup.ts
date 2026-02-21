@@ -455,9 +455,9 @@ export async function saveBackupToFile(backupId: string): Promise<boolean> {
     const isAvailable = await Sharing.isAvailableAsync();
     if (isAvailable) {
       await Sharing.shareAsync(filePath, {
-        mimeType: 'application/json',
+        mimeType: 'application/octet-stream',
         dialogTitle: 'Backup speichern',
-        UTI: 'public.json',
+        UTI: 'public.data',
       });
       console.log('[Backup] Sharing dialog opened');
       return true;
