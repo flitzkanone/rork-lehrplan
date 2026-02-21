@@ -19,6 +19,7 @@ import {
   importBackupFromString,
   scanForExternalBackups,
   importExternalBackup,
+  saveBackupToFile,
 } from '@/utils/backup';
 
 
@@ -239,6 +240,10 @@ export const [BackupProvider, useBackup] = createContextHook(() => {
     return exportBackupToString(backupId);
   }, []);
 
+  const exportBackupAsFile = useCallback(async (backupId: string): Promise<boolean> => {
+    return saveBackupToFile(backupId);
+  }, []);
+
   const importBackup = useCallback(
     async (backupString: string): Promise<BackupMetadata | null> => {
       const metadata = await importBackupFromString(backupString);
@@ -311,6 +316,7 @@ export const [BackupProvider, useBackup] = createContextHook(() => {
     removeBackup,
     updateSettings,
     exportBackup,
+    exportBackupAsFile,
     importBackup,
     getLatestBackup,
     scanExternalBackups,

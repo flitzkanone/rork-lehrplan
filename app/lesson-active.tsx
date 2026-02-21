@@ -227,7 +227,6 @@ function ReasonMenu({
     <Animated.View
       style={[
         styles.reasonMenu,
-        isNegative ? styles.reasonMenuNegative : styles.reasonMenuPositive,
         {
           opacity: fadeAnim,
           transform: [{ scale: scaleAnim }],
@@ -238,16 +237,13 @@ function ReasonMenu({
         <TouchableOpacity
           key={item.reason}
           style={[
-            styles.reasonChip,
-            isNegative ? styles.reasonChipNegative : styles.reasonChipPositive,
+            styles.reasonBtn,
+            isNegative ? styles.reasonBtnNegative : styles.reasonBtnPositive,
           ]}
           onPress={() => onSelect(item.reason)}
           activeOpacity={0.6}
         >
           {item.icon}
-          <Text style={[styles.reasonChipLabel, isNegative && styles.reasonChipLabelNegative]} numberOfLines={1}>
-            {item.label}
-          </Text>
         </TouchableOpacity>
       ))}
     </Animated.View>
@@ -937,41 +933,24 @@ const styles = StyleSheet.create({
   reasonMenu: {
     marginTop: 6,
     flexDirection: 'row',
+    justifyContent: 'flex-end',
     gap: 6,
     zIndex: 20,
   },
-  reasonMenuPositive: {},
-  reasonMenuNegative: {},
-  reasonChip: {
-    flex: 1,
-    flexDirection: 'row',
+  reasonBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    ...Platform.select({
-      ios: { shadowColor: 'rgba(0,0,0,0.06)', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 1, shadowRadius: 4 },
-      android: { elevation: 1 },
-      default: {},
-    }),
   },
-  reasonChipPositive: {
+  reasonBtnPositive: {
     backgroundColor: Colors.positiveLight,
     borderColor: Colors.positive,
   },
-  reasonChipNegative: {
+  reasonBtnNegative: {
     backgroundColor: Colors.negativeLight,
     borderColor: Colors.negative,
-  },
-  reasonChipLabel: {
-    fontSize: 11,
-    fontWeight: '600' as const,
-    color: Colors.text,
-  },
-  reasonChipLabelNegative: {
-    color: Colors.negative,
   },
 });

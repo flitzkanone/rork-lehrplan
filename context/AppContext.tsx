@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import createContextHook from '@nkzw/create-context-hook';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import type {
   AppData,
   SchoolClass,
@@ -148,8 +149,22 @@ export const [AppProvider, useApp] = createContextHook(() => {
       try {
         const encrypted = encrypt(JSON.stringify(newData), currentPinRef.current);
         await AsyncStorage.setItem(STORAGE_KEY, encrypted);
+        const verifyStored = await AsyncStorage.getItem(STORAGE_KEY);
+        if (!verifyStored) {
+          console.error('[AppContext] Save verification failed - data not found after write');
+          await AsyncStorage.setItem(STORAGE_KEY, encrypted);
+        } else {
+          console.log('[AppContext] Data saved and verified successfully');
+        }
       } catch (error) {
         console.error('[AppContext] Failed to save data:', error);
+        try {
+          const encrypted = encrypt(JSON.stringify(newData), currentPinRef.current);
+          await AsyncStorage.setItem(STORAGE_KEY, encrypted);
+          console.log('[AppContext] Retry save succeeded');
+        } catch (retryError) {
+          console.error('[AppContext] Retry save also failed:', retryError);
+        }
       }
       return newData;
     },
@@ -166,12 +181,22 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
   const { mutate: saveToStorage } = saveMutation;
 
+  const pendingSaveRef = useRef<NodeJS.Timeout | null>(null);
+  const latestDataRef = useRef<AppData>(defaultData);
+
   const save = useCallback(
     (updater: (prev: AppData) => AppData) => {
       setData((prev) => {
         try {
           const next = updater(prev);
-          queueMicrotask(() => saveToStorage(next));
+          latestDataRef.current = next;
+          if (pendingSaveRef.current) {
+            clearTimeout(pendingSaveRef.current);
+          }
+          pendingSaveRef.current = setTimeout(() => {
+            pendingSaveRef.current = null;
+            saveToStorage(next);
+          }, 300);
           return next;
         } catch (error) {
           console.error('[AppContext] Error in save updater:', error);
@@ -181,6 +206,23 @@ export const [AppProvider, useApp] = createContextHook(() => {
     },
     [saveToStorage]
   );
+
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'background' || nextAppState === 'inactive') {
+        if (pendingSaveRef.current) {
+          clearTimeout(pendingSaveRef.current);
+          pendingSaveRef.current = null;
+        }
+        if (currentPinRef.current && latestDataRef.current.onboardingComplete) {
+          console.log('[AppContext] App going to background, saving data immediately');
+          saveToStorage(latestDataRef.current);
+        }
+      }
+    };
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription.remove();
+  }, [saveToStorage]);
 
   const completeOnboarding = useCallback(
     async (profile: TeacherProfile, pin: string) => {
@@ -195,6 +237,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
         pinHash: pinHashValue,
       };
       setData(newData);
+      latestDataRef.current = newData;
       const encrypted = encrypt(JSON.stringify(newData), pin);
       await AsyncStorage.setItem(STORAGE_KEY, encrypted);
       setIsAuthenticated(true);
@@ -426,6 +469,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
           try {
             const parsedData = JSON.parse(decrypted) as AppData;
             setData(parsedData);
+            latestDataRef.current = parsedData;
             queryClient.setQueryData(['appData'], parsedData);
             
             if (parsedData.activeSession) {

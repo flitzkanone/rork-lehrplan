@@ -3,6 +3,7 @@ import CryptoJS from 'crypto-js';
 import { Platform } from 'react-native';
 import { encrypt, decrypt } from './encryption';
 import type { AppData, BackupMetadata, BackupFile, BackupLog, BackupSettings, ExternalBackupFile } from '@/types';
+import * as Sharing from 'expo-sharing';
 
 const BACKUP_PREFIX = 'teacher_app_backup_';
 const BACKUP_SETTINGS_KEY = 'teacher_app_backup_settings';
@@ -272,13 +273,12 @@ export function shouldRunScheduledBackup(settings: BackupSettings): boolean {
       return daysSinceLastBackup >= 1;
     
     case 'weekly':
-      if (dayOfWeek === 6) {
-        if (!lastBackup) return true;
-        const daysSince = Math.floor(
-          (now.getTime() - lastBackup.getTime()) / (1000 * 60 * 60 * 24)
-        );
-        return daysSince >= 6;
-      }
+      if (!lastBackup) return true;
+      const daysSinceWeekly = Math.floor(
+        (now.getTime() - lastBackup.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      if (daysSinceWeekly >= 7) return true;
+      if (dayOfWeek === 6 && daysSinceWeekly >= 6) return true;
       return false;
     
     case 'custom':
@@ -415,6 +415,60 @@ export async function scanForExternalBackups(): Promise<ExternalBackupFile[]> {
   }
 
   return foundBackups;
+}
+
+export async function saveBackupToFile(backupId: string): Promise<boolean> {
+  try {
+    const stored = await AsyncStorage.getItem(`${BACKUP_PREFIX}${backupId}`);
+    if (!stored) {
+      console.log('[Backup] Backup not found for file export:', backupId);
+      return false;
+    }
+
+    if (Platform.OS === 'web') {
+      try {
+        const blob = new Blob([stored], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `backup_${new Date().toISOString().split('T')[0]}.teacherbackup`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        console.log('[Backup] Web download triggered');
+        return true;
+      } catch (webError) {
+        console.log('[Backup] Web download error:', webError);
+        return false;
+      }
+    }
+
+    const { File, Paths } = await import('expo-file-system');
+    const fileName = `backup_${new Date().toISOString().split('T')[0]}.teacherbackup`;
+    const filePath = `${Paths.cache.uri}/${fileName}`;
+    const file = new File(filePath);
+    file.create();
+    await file.write(stored);
+    console.log('[Backup] Backup file created at:', filePath);
+
+    const isAvailable = await Sharing.isAvailableAsync();
+    if (isAvailable) {
+      await Sharing.shareAsync(filePath, {
+        mimeType: 'application/json',
+        dialogTitle: 'Backup speichern',
+        UTI: 'public.json',
+      });
+      console.log('[Backup] Sharing dialog opened');
+      return true;
+    } else {
+      console.log('[Backup] Sharing not available on this device');
+      return false;
+    }
+  } catch (error) {
+    console.log('[Backup] Save to file error:', error);
+    return false;
+  }
 }
 
 export async function importExternalBackup(uri: string): Promise<BackupMetadata | null> {

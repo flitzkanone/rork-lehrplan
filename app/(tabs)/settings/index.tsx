@@ -66,6 +66,7 @@ export default function SettingsScreen() {
     removeBackup,
     updateSettings,
     exportBackup,
+    exportBackupAsFile,
     importBackup,
     setGetPinFunction,
   } = useBackup();
@@ -169,7 +170,22 @@ export default function SettingsScreen() {
     console.log('[Settings] Starting manual backup with PIN available');
     const result = await performManualBackup(data);
     if (result) {
-      Alert.alert('Erfolg', 'Backup wurde erfolgreich erstellt.');
+      Alert.alert(
+        'Backup erstellt',
+        'Möchten Sie das Backup als Datei speichern?',
+        [
+          { text: 'Nein', style: 'cancel' },
+          {
+            text: 'Als Datei speichern',
+            onPress: async () => {
+              const saved = await exportBackupAsFile(result.id);
+              if (!saved) {
+                Alert.alert('Hinweis', 'Datei konnte nicht gespeichert werden. Das Backup ist intern gesichert.');
+              }
+            },
+          },
+        ]
+      );
     } else {
       Alert.alert('Fehler', 'Backup konnte nicht erstellt werden.');
     }
@@ -247,13 +263,34 @@ export default function SettingsScreen() {
   };
 
   const handleExportBackup = async (backup: BackupMetadata) => {
-    const exported = await exportBackup(backup.id);
-    if (exported) {
-      await Clipboard.setStringAsync(exported);
-      Alert.alert('Exportiert', 'Backup wurde in die Zwischenablage kopiert.');
-    } else {
-      Alert.alert('Fehler', 'Export fehlgeschlagen.');
-    }
+    Alert.alert(
+      'Backup exportieren',
+      'Wie möchten Sie das Backup exportieren?',
+      [
+        { text: 'Abbrechen', style: 'cancel' },
+        {
+          text: 'In Zwischenablage',
+          onPress: async () => {
+            const exported = await exportBackup(backup.id);
+            if (exported) {
+              await Clipboard.setStringAsync(exported);
+              Alert.alert('Exportiert', 'Backup wurde in die Zwischenablage kopiert.');
+            } else {
+              Alert.alert('Fehler', 'Export fehlgeschlagen.');
+            }
+          },
+        },
+        {
+          text: 'Als Datei speichern',
+          onPress: async () => {
+            const saved = await exportBackupAsFile(backup.id);
+            if (!saved) {
+              Alert.alert('Fehler', 'Datei konnte nicht gespeichert werden.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleImportBackup = async () => {
